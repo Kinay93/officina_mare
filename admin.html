@@ -192,7 +192,7 @@
 
     <section class="filters-bar">
       <div class="search-box">
-        <input id="searchInput" placeholder="Cerca per nome o telefono...">
+        <input id="searchInput" placeholder="Cerca per nome, telefono o email...">
       </div>
 
       <div class="filter-box">
@@ -242,18 +242,18 @@
       <div class="modal-grid-2">
         <div>
           <label for="mrName">Nome *</label>
-          <input id="mrName" required placeholder="Mario Rossi">
+          <input id="mrName" required autocomplete="name" placeholder="Mario Rossi">
         </div>
         <div>
           <label for="mrPhone">Telefono *</label>
-          <input id="mrPhone" required placeholder="+39 333 1234567">
+          <input id="mrPhone" type="tel" required inputmode="tel" autocomplete="tel" placeholder="+39 333 1234567">
         </div>
       </div>
 
       <div class="modal-grid-2" style="margin-top:14px;">
         <div>
           <label for="mrEmail">Email</label>
-          <input id="mrEmail" type="email" placeholder="mario@email.com">
+          <input id="mrEmail" type="email" inputmode="email" autocomplete="email" placeholder="mario@email.com">
         </div>
         <div>
           <label for="mrPeople">Persone *</label>
