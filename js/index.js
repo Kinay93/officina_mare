@@ -664,7 +664,7 @@ form?.addEventListener("submit", async (e) => {
 
     form.reset();
     timeEl.innerHTML = `<option value="">Seleziona prima data e turno</option>`;
-    showOk("Prenotazione inviata con successo. Riceverai una mail automatica di conferma richiesta.");
+    showOk("la prenotazione verrà confermata via mail");
 
     await loadClosedServicesForNextYear();
     await loadEvents();
