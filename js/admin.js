@@ -74,6 +74,15 @@ function toISODate(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+function formatDateIT(dateStr) {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(String(dateStr))) {
+    return String(dateStr || "");
+  }
+
+  const [yyyy, mm, dd] = String(dateStr).split("-");
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 function isToday(dateStr) {
   return dateStr === toISODate(new Date());
 }
@@ -115,6 +124,45 @@ function normalizeSpaces(value) {
 
 function sanitizeText(value, maxLen = 120) {
   return normalizeSpaces(String(value || "").replace(/<[^>]*>/g, "")).slice(0, maxLen);
+}
+
+function validateEmail(value) {
+  const email = normalizeSpaces(value).toLowerCase().slice(0, 120);
+
+  if (!email) {
+    return {
+      ok: true,
+      value: ""
+    };
+  }
+
+  const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+
+  if (!emailRegex.test(email)) {
+    return {
+      ok: false,
+      msg: "Formato email non valido."
+    };
+  }
+
+  return {
+    ok: true,
+    value: email
+  };
+}
+
+function normalizePhoneForWhatsapp(phone) {
+  let cleanPhone = String(phone || "").replace(/[^\d]/g, "");
+
+  if (cleanPhone.startsWith("00")) {
+    cleanPhone = cleanPhone.slice(2);
+  }
+
+  if (!cleanPhone.startsWith("39")) {
+    cleanPhone = "39" + cleanPhone;
+  }
+
+  return cleanPhone;
 }
 
 function defaultMaxCoversForMonth(monthIndex) {
@@ -161,8 +209,8 @@ function buildSlots(start, end, step) {
   return slots;
 }
 
-const lunchSlots = buildSlots("12:30", "15:00", 10);
-const dinnerSlots = buildSlots("18:30", "23:00", 10);
+const lunchSlots = buildSlots("12:30", "15:00", 15);
+const dinnerSlots = buildSlots("18:30", "23:00", 15);
 
 function isMonday(dateStr) {
   if (!dateStr) return false;
@@ -311,32 +359,46 @@ function getServiceOccupancyClass(covers, maxCovers) {
 }
 
 function getWhatsappLink(phone, message) {
-  const cleanPhone = String(phone || "").replace(/[^\d]/g, "");
-  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+  const cleanPhone = normalizePhoneForWhatsapp(phone);
+  return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
 }
 
 async function confirmReservation(reservation) {
-  const { error } = await supabase
-    .from("reservations")
-    .update({
-      status: "confirmed",
-      confirmation_sent: true,
-      confirmation_sent_at: new Date().toISOString()
-    })
-    .eq("id", reservation.id);
-
-  if (error) throw error;
-
   const time = String(reservation.reservation_time || "").slice(0, 5);
-  const msg = `Ciao ${reservation.customer_name}, la tua prenotazione da Officine Mare è confermata per il giorno ${reservation.reservation_date} alle ${time} per ${reservation.people} persone. Ti aspettiamo!`;
+  const dateIT = formatDateIT(reservation.reservation_date);
+
+  const msg = `Ciao ${reservation.customer_name}, la tua prenotazione da Officine Mare è confermata per il giorno ${dateIT} alle ${time} per ${reservation.people} persone. Ti aspettiamo!`;
+
+  let whatsappWindow = null;
 
   if (reservation.customer_phone) {
-    window.open(getWhatsappLink(reservation.customer_phone, msg), "_blank");
+    whatsappWindow = window.open("", "_blank");
   }
 
-  currentStatusView = "confirmed";
-  if (statusFilter) statusFilter.value = "all";
-  await loadReservations();
+  try {
+    const { error } = await supabase
+      .from("reservations")
+      .update({
+        status: "confirmed",
+        confirmation_sent: true,
+        confirmation_sent_at: new Date().toISOString()
+      })
+      .eq("id", reservation.id);
+
+    if (error) throw error;
+
+    if (whatsappWindow) {
+      whatsappWindow.location.href = getWhatsappLink(reservation.customer_phone, msg);
+    }
+
+    currentStatusView = "confirmed";
+    if (statusFilter) statusFilter.value = "all";
+    await loadReservations();
+
+  } catch (err) {
+    if (whatsappWindow) whatsappWindow.close();
+    alert("Errore conferma prenotazione: " + (err?.message || err));
+  }
 }
 
 async function rejectReservation(reservationId) {
@@ -487,7 +549,7 @@ function buildReservationCard(reservation, lunchMap, dinnerMap, calendarMap, rul
           </div>
 
           <div class="reservation-meta">
-            <span>📅 ${escapeHtml(reservation.reservation_date)}</span>
+            <span>📅 ${escapeHtml(formatDateIT(reservation.reservation_date))}</span>
             <span>🕒 ${escapeHtml(time)}</span>
             <span>📞 ${escapeHtml(reservation.customer_phone || "-")}</span>
             <span>🔖 ${escapeHtml(reservation.source || "web")}</span>
@@ -523,14 +585,22 @@ function attachCardActions(reservations) {
 
   reservationsList.querySelectorAll("[data-action='reject']").forEach(btn => {
     btn.addEventListener("click", async () => {
-      await rejectReservation(btn.dataset.id);
+      try {
+        await rejectReservation(btn.dataset.id);
+      } catch (err) {
+        alert("Errore rifiuto prenotazione: " + (err?.message || err));
+      }
     });
   });
 
   reservationsList.querySelectorAll("[data-action='tables']").forEach(btn => {
     btn.addEventListener("click", async () => {
-      const reservation = reservations.find(x => String(x.id) === String(btn.dataset.id));
-      if (reservation) await openTableAssign(reservation);
+      try {
+        const reservation = reservations.find(x => String(x.id) === String(btn.dataset.id));
+        if (reservation) await openTableAssign(reservation);
+      } catch (err) {
+        alert("Errore apertura tavoli: " + (err?.message || err));
+      }
     });
   });
 }
@@ -601,7 +671,7 @@ async function saveManualReservation(e) {
 
   const name = sanitizeText(document.getElementById("mrName")?.value, 80);
   const phone = sanitizeText(document.getElementById("mrPhone")?.value, 20);
-  const email = sanitizeText(document.getElementById("mrEmail")?.value, 120);
+  const emailCheck = validateEmail(document.getElementById("mrEmail")?.value);
   const date = mrDate?.value;
   const turno = mrTurno?.value;
   const time = mrTime?.value;
@@ -615,10 +685,15 @@ async function saveManualReservation(e) {
     return;
   }
 
+  if (!emailCheck.ok) {
+    alert(emailCheck.msg);
+    return;
+  }
+
   const fullNotes = [
     "Turno: " + turno,
     notes,
-    email ? "Email: " + email : ""
+    emailCheck.value ? "Email: " + emailCheck.value : ""
   ].filter(Boolean).join(" | ");
 
   const payload = {
@@ -700,9 +775,11 @@ if (statusFilter) {
 if (openManualReservationBtn) {
   openManualReservationBtn.addEventListener("click", openManualReservationModal);
 }
+
 if (closeManualReservationBtn) {
   closeManualReservationBtn.addEventListener("click", closeManualReservationModal);
 }
+
 if (cancelManualReservationBtn) {
   cancelManualReservationBtn.addEventListener("click", closeManualReservationModal);
 }
@@ -719,13 +796,38 @@ if (manualReservationForm) manualReservationForm.addEventListener("submit", save
 
 if (closeTablesModalBtn) closeTablesModalBtn.addEventListener("click", closeTablesModal);
 if (cancelTablesModalBtn) cancelTablesModalBtn.addEventListener("click", closeTablesModal);
-if (saveTablesBtn) saveTablesBtn.addEventListener("click", saveAssignedTables);
+
+if (saveTablesBtn) {
+  saveTablesBtn.addEventListener("click", async () => {
+    try {
+      await saveAssignedTables();
+    } catch (err) {
+      alert("Errore salvataggio tavoli: " + (err?.message || err));
+    }
+  });
+}
 
 if (tablesModal) {
   tablesModal.addEventListener("click", (e) => {
     if (e.target === tablesModal) closeTablesModal();
   });
 }
+
+document.getElementById("mrName")?.addEventListener("input", (e) => {
+  e.target.value = e.target.value.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ''.\- ]/g, "");
+});
+
+document.getElementById("mrPhone")?.addEventListener("input", (e) => {
+  e.target.value = e.target.value.replace(/[^\d+ ]/g, "");
+});
+
+document.getElementById("mrEmail")?.addEventListener("input", (e) => {
+  e.target.value = e.target.value.replace(/[<>"' ]/g, "");
+});
+
+document.getElementById("mrNotes")?.addEventListener("input", (e) => {
+  e.target.value = e.target.value.replace(/[<>]/g, "");
+});
 
 await requireAuth();
 await loadReservations();
