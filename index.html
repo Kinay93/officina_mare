@@ -7,7 +7,7 @@
   <link rel="icon" href="assets/logo.png">
   <link rel="stylesheet" href="css/theme.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
- 
+
   <style>
     :root{
       --page-light:#F7F2EA;
@@ -396,15 +396,16 @@
     }
   </style>
 </head>
+
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-PV7C8M79VB"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-
   gtag('config', 'G-PV7C8M79VB');
 </script>
+
 <body class="booking-page">
 
   <section class="hero">
@@ -420,8 +421,8 @@
       <h2>Prenotazione</h2>
       <p>
         Orari prenotabili: <br>
-        Lunedì chiuso   <br>
-        Martedì-Sabato 12:30/15:00 -  18:30/23:00   <br>
+        Lunedì chiuso <br>
+        Martedì-Sabato 12:30/15:00 - 18:30/23:00 <br>
         Domenica 12:30/15:00 <br>
       </p>
 
@@ -439,8 +440,8 @@
 
         <div class="booking-grid-2">
           <div class="field">
-            <label for="email">Email</label>
-            <input id="email" type="email" placeholder="mario@email.com">
+            <label for="email">Email *</label>
+            <input id="email" type="email" required placeholder="mario@email.com">
           </div>
           <div class="field">
             <label for="people">Persone *</label>
@@ -529,7 +530,6 @@
             <div class="hours-row"><span>Lunedì</span><span>Chiuso</span></div>
             <div class="hours-row"><span>Martedì - sabato</span><span>12:30–15:00 / 18:30–23:00</span></div>
             <div class="hours-row"><span>Domenica</span><span>12:30–15:00</span></div>
-
           </div>
         </div>
 
