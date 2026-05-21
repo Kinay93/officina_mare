@@ -50,8 +50,8 @@ function buildSlots(start, end, step) {
   return slots;
 }
 
-const lunchSlots = buildSlots("12:30", "15:00", 10);
-const dinnerSlots = buildSlots("18:30", "23:00", 10);
+const lunchSlots = buildSlots("12:30", "15:00", 15);
+const dinnerSlots = buildSlots("18:30", "23:00", 15);
 
 function normalizeDateToISO(value) {
   if (!value) return "";
@@ -59,18 +59,15 @@ function normalizeDateToISO(value) {
   const rawOriginal = String(value).trim();
   const raw = rawOriginal.toLowerCase().replace(/\s+/g, " ");
 
-  // già ISO yyyy-mm-dd
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
     return raw;
   }
 
-  // dd/mm/yyyy
   let m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (m) {
     return `${m[3]}-${pad(Number(m[2]))}-${pad(Number(m[1]))}`;
   }
 
-  // dd-mm-yyyy
   m = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
   if (m) {
     return `${m[3]}-${pad(Number(m[2]))}-${pad(Number(m[1]))}`;
@@ -91,7 +88,6 @@ function normalizeDateToISO(value) {
     dic: "12", dicembre: "12", dec: "12", december: "12"
   };
 
-  // "2 apr 2026" / "2 aprile 2026" — formato iPhone italiano
   m = raw.match(/^(\d{1,2})\s+([a-zà-ù]+)\.?\s+(\d{4})$/i);
   if (m) {
     const dd = pad(Number(m[1]));
@@ -100,7 +96,6 @@ function normalizeDateToISO(value) {
     if (mm) return `${yyyy}-${mm}-${dd}`;
   }
 
-  // "apr 2, 2026" / "april 2 2026" — formato iPhone inglese
   m = raw.match(/^([a-zà-ù]+)\.?\s+(\d{1,2}),?\s+(\d{4})$/i);
   if (m) {
     const mm = monthMap[m[1].replace(/\.$/, "")];
@@ -109,7 +104,6 @@ function normalizeDateToISO(value) {
     if (mm) return `${yyyy}-${mm}-${dd}`;
   }
 
-  // fallback con Date nativa (usa componenti locali per evitare shift Safari)
   const parsed = new Date(rawOriginal);
   if (!Number.isNaN(parsed.getTime())) {
     return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`;
@@ -360,9 +354,12 @@ function validatePhone(value) {
 function validateEmail(value) {
   let v = normalizeSpaces(value).toLowerCase().slice(0, 120);
 
-  if (!v) return { ok: true, value: "" };
+  if (!v) return { ok: false, msg: "Inserisci l'email." };
   if (containsDangerousPattern(v)) return { ok: false, msg: "Email non valida." };
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) {
+
+  const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+
+  if (!emailRegex.test(v)) {
     return { ok: false, msg: "Formato email non valido." };
   }
 
@@ -406,6 +403,10 @@ document.getElementById("name")?.addEventListener("input", (e) => {
 
 document.getElementById("phone")?.addEventListener("input", (e) => {
   e.target.value = e.target.value.replace(/[^\d+ ]/g, "");
+});
+
+document.getElementById("email")?.addEventListener("input", (e) => {
+  e.target.value = e.target.value.replace(/[<>"' ]/g, "");
 });
 
 dateEl?.addEventListener("change", async () => {
@@ -464,7 +465,7 @@ toggleDayMenuBtn?.addEventListener("click", async () => {
     }
 
     if (data?.image_url) {
-      dayMenuContent.innerHTML = `<img src="${data.image_url}" alt="Menù del giorno">`;
+      dayMenuContent.innerHTML = `<img src="${escapeHtml(data.image_url)}" alt="Menù del giorno">`;
     } else if (data?.text) {
       dayMenuContent.textContent = data.text;
     } else {
@@ -505,7 +506,7 @@ async function loadEvents() {
       <article class="event-card-mini" data-event-index="${index}">
         <img
           class="event-card-cover"
-          src="${ev.image_url || "assets/fondo.webp"}"
+          src="${escapeHtml(ev.image_url || "assets/fondo.webp")}"
           alt="${escapeHtml(ev.title || "Evento")}"
         >
         <div class="event-card-body">
@@ -607,7 +608,7 @@ form?.addEventListener("submit", async (e) => {
   const safeNotes = [
     "Turno: " + turnoEl.value,
     notesCheck.value,
-    emailCheck.value ? "Email: " + emailCheck.value : ""
+    "Email: " + emailCheck.value
   ].filter(Boolean).join(" | ");
 
   const payload = {
@@ -643,6 +644,7 @@ form?.addEventListener("submit", async (e) => {
           reservation_id: null,
           customer_name: payload.customer_name,
           customer_phone: payload.customer_phone,
+          customer_email: emailCheck.value,
           reservation_date: payload.reservation_date,
           reservation_time: payload.reservation_time,
           people: payload.people,
@@ -662,7 +664,7 @@ form?.addEventListener("submit", async (e) => {
 
     form.reset();
     timeEl.innerHTML = `<option value="">Seleziona prima data e turno</option>`;
-    showOk("Prenotazione inviata con successo.");
+    showOk("Prenotazione inviata con successo. Riceverai una mail automatica di conferma richiesta.");
 
     await loadClosedServicesForNextYear();
     await loadEvents();
