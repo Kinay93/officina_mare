@@ -338,15 +338,45 @@
 
     .hours-list{
       display:grid;
-      gap:6px;
+      gap:0;
       margin-top:4px;
+      overflow:hidden;
+      border:1px solid var(--border);
+      border-radius:14px;
+      background:#fff;
     }
 
     .hours-row{
-      display:flex;
-      justify-content:space-between;
+      display:grid;
+      grid-template-columns:110px 1fr;
       gap:12px;
-      flex-wrap:wrap;
+      align-items:center;
+      padding:10px 12px;
+      border-bottom:1px solid var(--border);
+      font-size:14px;
+    }
+
+    .hours-row:last-child{
+      border-bottom:0;
+    }
+
+    .hours-row span:first-child{
+      font-weight:800;
+      color:var(--text);
+    }
+
+    .hours-row span:last-child{
+      color:var(--muted);
+      text-align:right;
+    }
+
+    .hours-row:first-child{
+      background:var(--surface-soft);
+    }
+
+    .hours-row:first-child span{
+      font-weight:900;
+      color:var(--text);
     }
 
     .hours-note{
@@ -422,6 +452,19 @@
 
       #eventCardsWrap{
         grid-template-columns:1fr;
+      }
+    }
+
+    @media (max-width:600px){
+      .hours-row{
+        grid-template-columns:92px 1fr;
+        gap:8px;
+        padding:10px;
+        font-size:13px;
+      }
+
+      .hours-row span:last-child{
+        text-align:right;
       }
     }
   </style>
@@ -571,14 +614,12 @@
 
           <div class="hours-list" id="publicHoursList">
             <div class="hours-row">
-              <span>Orari prenotabili</span>
-              <span>Gestiti dal calendario</span>
+              <span>Giorno</span>
+              <span>Pranzo / Cena</span>
             </div>
           </div>
 
-          <div class="hours-note" id="publicHoursNote">
-            Gli orari possono variare in base al giorno, agli eventi, ai festivi e alle regole impostate dal ristorante.
-          </div>
+          <div class="hours-note" id="publicHoursNote"></div>
         </div>
 
         <div class="info-item">
