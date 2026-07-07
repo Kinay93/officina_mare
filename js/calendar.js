@@ -56,9 +56,7 @@ function setStatus(message, type = "") {
   calendarStatus.textContent = message || "";
   calendarStatus.className = "calendar-status";
 
-  if (type) {
-    calendarStatus.classList.add(type);
-  }
+  if (type) calendarStatus.classList.add(type);
 }
 
 function setRulesStatus(message, type = "") {
@@ -67,9 +65,7 @@ function setRulesStatus(message, type = "") {
   serviceRulesStatus.textContent = message || "";
   serviceRulesStatus.className = "rules-status";
 
-  if (type) {
-    serviceRulesStatus.classList.add(type);
-  }
+  if (type) serviceRulesStatus.classList.add(type);
 }
 
 function pad(n) {
@@ -105,7 +101,6 @@ function normalizeDateToISO(value) {
   }
 
   const parsed = new Date(raw);
-
   if (!Number.isNaN(parsed.getTime())) {
     return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`;
   }
@@ -131,7 +126,6 @@ function monthTitle(date) {
 function monthBounds(date) {
   const first = new Date(date.getFullYear(), date.getMonth(), 1);
   const last = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-
   return { first, last };
 }
 
@@ -139,9 +133,7 @@ function toMinutes(hhmm) {
   const clean = String(hhmm || "").slice(0, 5);
   const [h, m] = clean.split(":").map(Number);
 
-  if (!Number.isFinite(h) || !Number.isFinite(m)) {
-    return 0;
-  }
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
 
   return h * 60 + m;
 }
@@ -180,10 +172,7 @@ function getRuleForDay(dayISO, rules) {
   const monthIndex = getLocalDateFromISO(dayISO).getMonth();
   const base = defaultCapForMonth(monthIndex);
 
-  return {
-    lunch: base,
-    dinner: base
-  };
+  return { lunch: base, dinner: base };
 }
 
 function getEasterDate(year) {
@@ -224,9 +213,7 @@ function isItalianHoliday(dayISO) {
     "12-26"
   ]);
 
-  if (fixedHolidays.has(mmdd)) {
-    return true;
-  }
+  if (fixedHolidays.has(mmdd)) return true;
 
   const easter = getEasterDate(year);
   const easterMonday = new Date(easter);
@@ -324,9 +311,7 @@ function getServiceRuleForDay(dayISO, service, rules = serviceRulesCache) {
   let selected = null;
 
   for (const rule of rules) {
-    if (!ruleMatchesDay(rule, dayISO, service)) {
-      continue;
-    }
+    if (!ruleMatchesDay(rule, dayISO, service)) continue;
 
     if (!selected) {
       selected = rule;
@@ -353,9 +338,7 @@ function getServiceRuleForDay(dayISO, service, rules = serviceRulesCache) {
 
   const fallback = getDefaultServiceRuleForDay(dayISO, service);
 
-  if (!selected) {
-    return fallback;
-  }
+  if (!selected) return fallback;
 
   return {
     open_time: selected.open_time || fallback.open_time,
@@ -382,9 +365,7 @@ function groupReservationsByDay(reservations) {
   const map = new Map();
 
   for (const row of reservations) {
-    if (row.status === "cancelled" || row.hidden) {
-      continue;
-    }
+    if (row.status === "cancelled" || row.hidden) continue;
 
     const day = row.reservation_date;
 
@@ -433,14 +414,8 @@ function serviceStateClass(covers, max, blocked) {
 }
 
 function dayClass(lunchState, dinnerState) {
-  if (lunchState === "full" || dinnerState === "full") {
-    return "day-full";
-  }
-
-  if (lunchState === "warning" || dinnerState === "warning") {
-    return "day-warning";
-  }
-
+  if (lunchState === "full" || dinnerState === "full") return "day-full";
+  if (lunchState === "warning" || dinnerState === "warning") return "day-warning";
   return "day-available";
 }
 
@@ -455,9 +430,7 @@ function weekdayLabel(value) {
     6: "Sabato"
   };
 
-  if (value === null || value === undefined || value === "") {
-    return "Non specifico";
-  }
+  if (value === null || value === undefined || value === "") return "Non specifico";
 
   return labels[Number(value)] || "Non specifico";
 }
@@ -483,9 +456,7 @@ function scopeLabel(scope) {
 }
 
 function serviceRuleHoursText(rule) {
-  if (!rule) {
-    return "Orari standard";
-  }
+  if (!rule) return "Orari standard";
 
   if (rule.closed) {
     return rule.reason || "Chiuso";
@@ -910,12 +881,12 @@ function getServiceRulePayloadsFromForm() {
     let finalCloseTime = closeTime;
 
     if (service === "both" && !closed) {
-      if (s === "lunch") {
+      if (s === "lunch" && openTime === "18:30" && closeTime === "23:00") {
         finalOpenTime = "12:30";
         finalCloseTime = "15:00";
       }
 
-      if (s === "dinner") {
+      if (s === "dinner" && openTime === "12:30" && closeTime === "15:00") {
         finalOpenTime = "18:30";
         finalCloseTime = "23:00";
       }
@@ -938,12 +909,15 @@ function getServiceRulePayloadsFromForm() {
 }
 
 async function insertServiceRules(payloads) {
+  console.log("Regole da salvare:", payloads);
+
   const { error } = await supabase
     .from("booking_service_rules")
     .insert(payloads);
 
   if (error) {
-    throw error;
+    console.error("Errore insert booking_service_rules:", error);
+    throw new Error(`${error.message} ${error.code ? "(" + error.code + ")" : ""}`);
   }
 }
 
@@ -1155,7 +1129,7 @@ async function handleQuickRule(type) {
         close_time: "15:00",
         slot_step: step,
         note: "Ripristino orario standard pranzo",
-        priority: 100
+        priority: 10
       }),
       baseQuickRulePayload({
         service: "dinner",
@@ -1165,7 +1139,7 @@ async function handleQuickRule(type) {
         close_time: "23:00",
         slot_step: step,
         note: "Ripristino orario standard cena",
-        priority: 100
+        priority: 10
       })
     ], "Orari standard ripristinati ✅");
   }
@@ -1230,6 +1204,7 @@ async function loadServiceRulesList() {
     const sub = [
       `Periodo: ${startDay} → ${endDay}`,
       `Applica a: ${scopeLabel(row.scope)}`,
+      `Priorità: ${Number(row.priority || 10)}`,
       row.weekday !== null && row.weekday !== undefined ? `Giorno: ${weekdayLabel(row.weekday)}` : "",
       row.note ? `Nota: ${row.note}` : ""
     ].filter(Boolean).join(" · ");
