@@ -89,6 +89,195 @@
     .dot-red{ background:#C84A4A; }
     .dot-gray{ background:#7C8798; }
 
+    .rules-card{
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:24px;
+      box-shadow:0 12px 34px rgba(16,40,74,.08);
+      padding:24px;
+      margin-bottom:22px;
+    }
+
+    .rules-card-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:14px;
+      flex-wrap:wrap;
+      margin-bottom:18px;
+    }
+
+    .rules-card-head h2{
+      margin:0;
+      font-size:24px;
+      color:var(--text);
+    }
+
+    .rules-card-head p{
+      margin:8px 0 0;
+      color:var(--muted);
+      line-height:1.5;
+    }
+
+    .rules-grid{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0, 1fr));
+      gap:14px;
+      margin-bottom:14px;
+    }
+
+    .rules-grid-3{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:14px;
+      margin-bottom:14px;
+    }
+
+    .rules-field label{
+      display:block;
+      margin-bottom:7px;
+      color:var(--text);
+      font-weight:900;
+      font-size:13px;
+    }
+
+    .rules-field input,
+    .rules-field select,
+    .rules-field textarea{
+      width:100%;
+    }
+
+    .rules-actions{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-top:12px;
+    }
+
+    .rules-status{
+      margin-top:14px;
+      font-size:14px;
+      font-weight:800;
+    }
+
+    .rules-status.ok{ color:#138a5a; }
+    .rules-status.bad{ color:#bf3d3d; }
+
+    .quick-rules{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0, 1fr));
+      gap:12px;
+      margin-top:18px;
+    }
+
+    .quick-rule-btn{
+      min-height:54px;
+      border-radius:18px;
+      border:1px solid var(--border);
+      background:#F9FBFE;
+      color:var(--text);
+      font-weight:900;
+      cursor:pointer;
+      padding:12px;
+      text-align:left;
+      transition:.15s ease;
+    }
+
+    .quick-rule-btn:hover{
+      transform:translateY(-1px);
+      box-shadow:0 8px 18px rgba(16,40,74,.08);
+      background:#fff;
+    }
+
+    .quick-rule-btn span{
+      display:block;
+      color:var(--muted);
+      font-weight:700;
+      font-size:12px;
+      margin-top:4px;
+      line-height:1.35;
+    }
+
+    .rules-list-wrap{
+      margin-top:20px;
+      border-top:1px solid var(--border);
+      padding-top:18px;
+    }
+
+    .rules-list-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+
+    .rules-list-head h3{
+      margin:0;
+      font-size:18px;
+      color:var(--text);
+    }
+
+    .rules-list{
+      display:grid;
+      gap:10px;
+    }
+
+    .rule-row{
+      display:grid;
+      grid-template-columns:1.2fr 1fr 1fr auto;
+      gap:10px;
+      align-items:center;
+      padding:12px;
+      border:1px solid var(--border);
+      border-radius:18px;
+      background:#FAFCFF;
+    }
+
+    .rule-row-main{
+      display:grid;
+      gap:5px;
+    }
+
+    .rule-row-title{
+      font-weight:900;
+      color:var(--text);
+    }
+
+    .rule-row-sub{
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.4;
+    }
+
+    .rule-pill{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:#fff;
+      color:#53657F;
+      font-size:12px;
+      font-weight:900;
+      width:max-content;
+    }
+
+    .rule-pill.closed{
+      background:#FFE9E9;
+      border-color:#F0B8B8;
+      color:#B83939;
+    }
+
+    .rule-pill.open{
+      background:#DFF5E8;
+      border-color:#B8E7CA;
+      color:#127A54;
+    }
+
     .calendar-grid{
       display:grid;
       grid-template-columns:repeat(7, minmax(195px, 1fr));
@@ -178,6 +367,22 @@
       font-weight:900;
     }
 
+    .service-hours-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 8px;
+      border-radius:999px;
+      background:#fff;
+      border:1px solid #E3EAF3;
+      color:#53657F;
+      font-size:12px;
+      font-weight:900;
+      width:100%;
+      justify-content:center;
+      margin-bottom:10px;
+    }
+
     .service-actions{
       display:grid;
       grid-template-columns:1fr 1fr;
@@ -227,6 +432,19 @@
       .day-card{
         min-width:180px;
       }
+
+      .rules-grid,
+      .quick-rules{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+      }
+
+      .rules-grid-3{
+        grid-template-columns:1fr;
+      }
+
+      .rule-row{
+        grid-template-columns:1fr;
+      }
     }
 
     @media (max-width: 768px){
@@ -247,9 +465,24 @@
         flex-direction:row;
         justify-content:flex-start;
       }
+
+      .rules-card{
+        padding:18px;
+      }
+
+      .rules-grid,
+      .rules-grid-3,
+      .quick-rules{
+        grid-template-columns:1fr;
+      }
+
+      .rules-actions .btn{
+        width:100%;
+      }
     }
   </style>
 </head>
+
 <body>
 <div class="admin-shell">
 
@@ -294,7 +527,193 @@
   <main class="admin-content">
     <section class="page-header">
       <h1>Gestisci calendario</h1>
-      <p>Blocca pranzo o cena e imposta la capienza da una data in avanti</p>
+      <p>Blocca servizi, cambia capienze e gestisci gli orari visibili nella pagina di prenotazione</p>
+    </section>
+
+    <section class="rules-card">
+      <div class="rules-card-head">
+        <div>
+          <h2>Orari e blocchi prenotazioni</h2>
+          <p>
+            Da qui puoi decidere quali orari mostrare su index.html e puoi bloccare pranzi, cene,
+            giorni specifici, feriali o festivi.
+          </p>
+        </div>
+
+        <button class="btn btn-soft" type="button" id="reloadServiceRulesBtn">
+          Aggiorna regole
+        </button>
+      </div>
+
+      <form id="serviceRuleForm">
+        <div class="rules-grid">
+          <div class="rules-field">
+            <label for="ruleStartDay">Dal giorno *</label>
+            <input id="ruleStartDay" type="date" required>
+          </div>
+
+          <div class="rules-field">
+            <label for="ruleEndDay">Fino al giorno</label>
+            <input id="ruleEndDay" type="date">
+          </div>
+
+          <div class="rules-field">
+            <label for="ruleService">Servizio *</label>
+            <select id="ruleService" required>
+              <option value="both">Pranzo e cena</option>
+              <option value="lunch">Solo pranzo</option>
+              <option value="dinner">Solo cena</option>
+            </select>
+          </div>
+
+          <div class="rules-field">
+            <label for="ruleClosed">Stato *</label>
+            <select id="ruleClosed" required>
+              <option value="false">Aperto / prenotabile</option>
+              <option value="true">Bloccato / non prenotabile</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="rules-grid">
+          <div class="rules-field">
+            <label for="ruleScope">Applica a *</label>
+            <select id="ruleScope" required>
+              <option value="all">Tutti i giorni</option>
+              <option value="weekday">Un giorno della settimana</option>
+              <option value="working_days">Giorni feriali</option>
+              <option value="holidays">Festivi e domeniche</option>
+              <option value="custom">Solo questa data / periodo</option>
+            </select>
+          </div>
+
+          <div class="rules-field">
+            <label for="ruleWeekday">Giorno settimana</label>
+            <select id="ruleWeekday">
+              <option value="">Non specifico</option>
+              <option value="1">Lunedì</option>
+              <option value="2">Martedì</option>
+              <option value="3">Mercoledì</option>
+              <option value="4">Giovedì</option>
+              <option value="5">Venerdì</option>
+              <option value="6">Sabato</option>
+              <option value="0">Domenica</option>
+            </select>
+          </div>
+
+          <div class="rules-field">
+            <label for="ruleOpenTime">Apertura</label>
+            <input id="ruleOpenTime" type="time" value="12:30">
+          </div>
+
+          <div class="rules-field">
+            <label for="ruleCloseTime">Chiusura</label>
+            <input id="ruleCloseTime" type="time" value="15:00">
+          </div>
+        </div>
+
+        <div class="rules-grid-3">
+          <div class="rules-field">
+            <label for="ruleSlotStep">Intervallo orari</label>
+            <select id="ruleSlotStep">
+              <option value="15">Ogni 15 minuti</option>
+              <option value="30">Ogni 30 minuti</option>
+              <option value="45">Ogni 45 minuti</option>
+              <option value="60">Ogni 60 minuti</option>
+            </select>
+          </div>
+
+          <div class="rules-field">
+            <label for="rulePriority">Priorità</label>
+            <select id="rulePriority">
+              <option value="10">Normale</option>
+              <option value="50">Alta</option>
+              <option value="100">Massima</option>
+            </select>
+          </div>
+
+          <div class="rules-field">
+            <label for="ruleNote">Nota</label>
+            <input id="ruleNote" placeholder="Esempio: chiusura straordinaria, evento, festivo...">
+          </div>
+        </div>
+
+        <div class="rules-actions">
+          <button class="btn btn-primary" type="submit" id="saveServiceRuleBtn">
+            Salva regola
+          </button>
+
+          <button class="btn btn-soft" type="reset" id="resetServiceRuleBtn">
+            Pulisci
+          </button>
+
+          <button class="btn btn-danger" type="button" id="deletePastRulesBtn">
+            Elimina regole passate
+          </button>
+        </div>
+
+        <div id="serviceRulesStatus" class="rules-status"></div>
+      </form>
+
+      <div class="quick-rules">
+        <button class="quick-rule-btn" type="button" data-quick-rule="close-all-lunch">
+          Blocca tutti i pranzi
+          <span>Da una data in avanti, o fino a una data scelta.</span>
+        </button>
+
+        <button class="quick-rule-btn" type="button" data-quick-rule="close-all-dinner">
+          Blocca tutte le cene
+          <span>Utile per chiudere il servizio serale.</span>
+        </button>
+
+        <button class="quick-rule-btn" type="button" data-quick-rule="close-weekday">
+          Blocca un giorno fisso
+          <span>Esempio: tutti i lunedì, pranzo e cena.</span>
+        </button>
+
+        <button class="quick-rule-btn" type="button" data-quick-rule="close-holiday-lunch">
+          Blocca pranzi festivi
+          <span>Festivi nazionali e domeniche.</span>
+        </button>
+
+        <button class="quick-rule-btn" type="button" data-quick-rule="close-holiday-dinner">
+          Blocca cene festive
+          <span>Festivi nazionali e domeniche.</span>
+        </button>
+
+        <button class="quick-rule-btn" type="button" data-quick-rule="close-working-lunch">
+          Blocca pranzi feriali
+          <span>Dal lunedì al sabato, esclusi festivi.</span>
+        </button>
+
+        <button class="quick-rule-btn" type="button" data-quick-rule="close-working-dinner">
+          Blocca cene feriali
+          <span>Dal lunedì al sabato, esclusi festivi.</span>
+        </button>
+
+        <button class="quick-rule-btn" type="button" data-quick-rule="open-standard">
+          Ripristina orari standard
+          <span>Pranzo 12:30-15:00, cena 18:30-23:00.</span>
+        </button>
+      </div>
+
+      <div class="rules-list-wrap">
+        <div class="rules-list-head">
+          <h3>Regole attive e future</h3>
+          <button class="btn btn-soft" type="button" id="reloadServiceRulesListBtn">
+            Ricarica lista
+          </button>
+        </div>
+
+        <div id="serviceRulesList" class="rules-list">
+          <div class="rule-row">
+            <div class="rule-row-main">
+              <div class="rule-row-title">Caricamento regole...</div>
+              <div class="rule-row-sub">Le regole verranno mostrate qui.</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="calendar-toolbar">
@@ -302,8 +721,9 @@
         <h2 class="calendar-title" id="calendarMonthTitle">Calendario</h2>
 
         <div class="calendar-helper">
-          <span class="helper-pill">🔒 blocca / sblocca servizio</span>
+          <span class="helper-pill">🔒 blocca / sblocca servizio singolo</span>
           <span class="helper-pill">👥 cambia capienza da quel giorno in avanti</span>
+          <span class="helper-pill">🕒 orari letti dalle regole sopra</span>
           <span class="helper-pill">🗓 prenotazioni / coperti</span>
         </div>
       </div>
