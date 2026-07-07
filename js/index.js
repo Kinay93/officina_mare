@@ -9,6 +9,15 @@ const timeEl = document.getElementById("time");
 const eventsSection = document.getElementById("eventsSection");
 const eventCardsWrap = document.getElementById("eventCardsWrap");
 
+const eventModal = document.getElementById("eventModal");
+const eventModalBackdrop = document.getElementById("eventModalBackdrop");
+const eventModalClose = document.getElementById("eventModalClose");
+const eventModalImage = document.getElementById("eventModalImage");
+const eventModalDate = document.getElementById("eventModalDate");
+const eventModalTitle = document.getElementById("eventModalTitle");
+const eventModalDescription = document.getElementById("eventModalDescription");
+const eventModalBookBtn = document.getElementById("eventModalBookBtn");
+
 const dayMenuPanel = document.getElementById("dayMenuPanel");
 const dayMenuContent = document.getElementById("dayMenuContent");
 const toggleDayMenuBtn = document.getElementById("toggleDayMenuBtn");
@@ -19,6 +28,7 @@ const publicHoursNote = document.getElementById("publicHoursNote");
 let closedServiceMap = new Map();
 let rulesCache = [];
 let serviceRulesCache = [];
+let selectedEventForModal = null;
 
 function pad(n) {
   return String(n).padStart(2, "0");
@@ -753,6 +763,64 @@ function getEventServiceFromTime(startTime) {
   return "pranzo";
 }
 
+function formatEventDateText(startDate, endDate, startTime, endTime) {
+  const dateText = `${startDate}${endDate && endDate !== startDate ? " → " + endDate : ""}`;
+  const timeText = startTime ? ` · ${startTime}${endTime ? " - " + endTime : ""}` : "";
+
+  return `${dateText}${timeText}`;
+}
+
+function openEventModal(eventData) {
+  selectedEventForModal = eventData;
+
+  if (!eventModal) return;
+
+  eventModalImage.src = eventData.image_url || "assets/fondo.webp";
+  eventModalImage.alt = eventData.title || "Evento";
+  eventModalDate.textContent = eventData.dateText || "";
+  eventModalTitle.textContent = eventData.title || "Evento";
+  eventModalDescription.textContent = eventData.description || "Dettagli evento disponibili a breve.";
+
+  eventModal.classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+function closeEventModal() {
+  selectedEventForModal = null;
+
+  eventModal?.classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+async function bookSelectedEventFromModal() {
+  if (!selectedEventForModal) return;
+
+  const eventData = selectedEventForModal;
+
+  closeEventModal();
+
+  const fakeBtn = {
+    dataset: {
+      date: eventData.startDate,
+      time: eventData.startTime,
+      service: eventData.service,
+      title: eventData.title
+    }
+  };
+
+  await handleEventBooking(fakeBtn);
+}
+
+eventModalClose?.addEventListener("click", closeEventModal);
+eventModalBackdrop?.addEventListener("click", closeEventModal);
+eventModalBookBtn?.addEventListener("click", bookSelectedEventFromModal);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeEventModal();
+  }
+});
+
 function setTimeIfAvailableOrAppend(timeValue) {
   const cleanTime = String(timeValue || "").slice(0, 5);
 
@@ -904,7 +972,7 @@ toggleDayMenuBtn?.addEventListener("click", async () => {
 
 async function loadEvents() {
   const fromISO = todayISO();
-  const toISO = addDaysISO(31);
+  const toISO = addDaysISO(60);
 
   const { data, error } = await supabase
     .from("events")
@@ -929,83 +997,55 @@ async function loadEvents() {
 
   eventsSection?.classList.add("show");
 
-  if (eventCardsWrap) {
-    eventCardsWrap.innerHTML = eventsData.map((ev, index) => {
-      const startDate = normalizeDateToISO(ev.start_date || "");
-      const endDate = normalizeDateToISO(ev.end_date || ev.start_date || "");
-      const startTime = ev.start_time ? String(ev.start_time).slice(0, 5) : "";
-      const endTime = ev.end_time ? String(ev.end_time).slice(0, 5) : "";
-      const service = getEventServiceFromTime(startTime);
-      const title = ev.title || "Evento";
-      const description = ev.description || "Dettagli evento disponibili a breve.";
-      const preview = description.slice(0, 90);
-      const dateText = `${startDate}${endDate && endDate !== startDate ? " → " + endDate : ""}`;
-      const timeText = startTime ? ` · 🕒 ${startTime}${endTime ? " - " + endTime : ""}` : "";
+  if (!eventCardsWrap) return;
 
-      return `
-        <article class="event-card-mini" data-event-index="${index}">
-          <img
-            class="event-card-cover"
-            src="${escapeHtml(ev.image_url || "assets/fondo.webp")}"
-            alt="${escapeHtml(title)}"
-          >
-          <div class="event-card-body">
-            <div class="event-card-date">
-              📅 ${escapeHtml(dateText)}${escapeHtml(timeText)}
-            </div>
+  eventCardsWrap.innerHTML = eventsData.map((ev, index) => {
+    const startDate = normalizeDateToISO(ev.start_date || "");
+    const endDate = normalizeDateToISO(ev.end_date || ev.start_date || "");
+    const startTime = ev.start_time ? String(ev.start_time).slice(0, 5) : "";
+    const endTime = ev.end_time ? String(ev.end_time).slice(0, 5) : "";
+    const service = getEventServiceFromTime(startTime);
+    const title = ev.title || "Evento";
+    const description = ev.description || "Dettagli evento disponibili a breve.";
+    const imageUrl = ev.image_url || "assets/fondo.webp";
+    const dateText = formatEventDateText(startDate, endDate, startTime, endTime);
 
-            <div class="event-card-title">${escapeHtml(title)}</div>
+    return `
+      <button
+        type="button"
+        class="event-preview-card"
+        data-event-index="${index}"
+        data-date="${escapeHtml(startDate)}"
+        data-time="${escapeHtml(startTime)}"
+        data-service="${escapeHtml(service)}"
+        data-title="${escapeHtml(title)}"
+        data-description="${escapeHtml(description)}"
+        data-image="${escapeHtml(imageUrl)}"
+        data-date-text="${escapeHtml(dateText)}"
+      >
+        <div class="event-preview-circle">
+          <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(title)}">
+        </div>
 
-            <div class="event-card-preview">
-              ${escapeHtml(preview)}
-              ${description.length > 90 ? "..." : ""}
-            </div>
+        <div class="event-preview-title">${escapeHtml(title)}</div>
+        <div class="event-preview-date">${escapeHtml(dateText)}</div>
+      </button>
+    `;
+  }).join("");
 
-            <div class="event-card-full">
-              ${escapeHtml(description)}
-
-              <div class="event-card-actions">
-                <button
-                  type="button"
-                  class="btn btn-primary btn-book-event"
-                  data-date="${escapeHtml(startDate)}"
-                  data-time="${escapeHtml(startTime)}"
-                  data-service="${escapeHtml(service)}"
-                  data-title="${escapeHtml(title)}"
-                >
-                  Prenota evento
-                </button>
-              </div>
-            </div>
-          </div>
-        </article>
-      `;
-    }).join("");
-
-    document.querySelectorAll(".event-card-mini").forEach(card => {
-      card.addEventListener("click", (e) => {
-        if (e.target.closest(".btn-book-event")) return;
-        card.classList.toggle("open");
+  document.querySelectorAll(".event-preview-card").forEach(card => {
+    card.addEventListener("click", () => {
+      openEventModal({
+        startDate: card.dataset.date || "",
+        startTime: card.dataset.time || "",
+        service: card.dataset.service || "pranzo",
+        title: card.dataset.title || "Evento",
+        description: card.dataset.description || "Dettagli evento disponibili a breve.",
+        image_url: card.dataset.image || "assets/fondo.webp",
+        dateText: card.dataset.dateText || ""
       });
-
-      card.addEventListener("touchstart", (e) => {
-        if (e.target.closest(".btn-book-event")) return;
-        card.classList.toggle("open");
-      }, { passive: true });
     });
-
-    document.querySelectorAll(".btn-book-event").forEach(btn => {
-      btn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        await handleEventBooking(btn);
-      });
-
-      btn.addEventListener("touchstart", (e) => {
-        e.stopPropagation();
-      }, { passive: true });
-    });
-  }
+  });
 }
 
 form?.addEventListener("submit", async (e) => {
