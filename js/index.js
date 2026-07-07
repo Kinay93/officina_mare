@@ -95,43 +95,12 @@ function normalizeDateToISO(value) {
     return `${m[3]}-${pad(Number(m[2]))}-${pad(Number(m[1]))}`;
   }
 
-  const monthMap = {
-    gen: "01", gennaio: "01", jan: "01", january: "01",
-    feb: "02", febbraio: "02", february: "02",
-    mar: "03", marzo: "03", march: "03",
-    apr: "04", aprile: "04", april: "04",
-    mag: "05", maggio: "05", may: "05",
-    giu: "06", giugno: "06", jun: "06", june: "06",
-    lug: "07", luglio: "07", jul: "07", july: "07",
-    ago: "08", agosto: "08", aug: "08", august: "08",
-    set: "09", sett: "09", settembre: "09", sep: "09", sept: "09", september: "09",
-    ott: "10", ottobre: "10", oct: "10", october: "10",
-    nov: "11", novembre: "11", november: "11",
-    dic: "12", dicembre: "12", dec: "12", december: "12"
-  };
-
-  m = raw.match(/^(\d{1,2})\s+([a-zà-ù]+)\.?\s+(\d{4})$/i);
-  if (m) {
-    const dd = pad(Number(m[1]));
-    const mm = monthMap[m[2].replace(/\.$/, "")];
-    const yyyy = m[3];
-    if (mm) return `${yyyy}-${mm}-${dd}`;
-  }
-
-  m = raw.match(/^([a-zà-ù]+)\.?\s+(\d{1,2}),?\s+(\d{4})$/i);
-  if (m) {
-    const mm = monthMap[m[1].replace(/\.$/, "")];
-    const dd = pad(Number(m[2]));
-    const yyyy = m[3];
-    if (mm) return `${yyyy}-${mm}-${dd}`;
-  }
-
   const parsed = new Date(rawOriginal);
+
   if (!Number.isNaN(parsed.getTime())) {
     return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`;
   }
 
-  console.warn("normalizeDateToISO: formato non riconosciuto →", JSON.stringify(rawOriginal));
   return "";
 }
 
@@ -143,14 +112,14 @@ function getWeekday(dayISO) {
   return getLocalDateFromISO(dayISO).getDay();
 }
 
-function isMonday(dateStr) {
-  if (!dateStr) return false;
-  return getWeekday(dateStr) === 1;
+function isMonday(dayISO) {
+  if (!dayISO) return false;
+  return getWeekday(dayISO) === 1;
 }
 
-function isSunday(dateStr) {
-  if (!dateStr) return false;
-  return getWeekday(dateStr) === 0;
+function isSunday(dayISO) {
+  if (!dayISO) return false;
+  return getWeekday(dayISO) === 0;
 }
 
 function getEasterDate(year) {
@@ -218,8 +187,11 @@ function getRuleForDay(dayISO, rules) {
   let selected = null;
 
   for (const rule of rules) {
-    if (rule.start_day <= dayISO) selected = rule;
-    else break;
+    if (rule.start_day <= dayISO) {
+      selected = rule;
+    } else {
+      break;
+    }
   }
 
   if (selected) {
@@ -230,9 +202,12 @@ function getRuleForDay(dayISO, rules) {
   }
 
   const monthIndex = getLocalDateFromISO(dayISO).getMonth();
-  const d = defaultMaxCoversForMonth(monthIndex);
+  const base = defaultMaxCoversForMonth(monthIndex);
 
-  return { lunch: d, dinner: d };
+  return {
+    lunch: base,
+    dinner: base
+  };
 }
 
 function getDefaultServiceRuleForDay(dayISO, service) {
@@ -618,7 +593,7 @@ function validateEmail(value) {
 }
 
 function validateNotes(value) {
-  let v = sanitizeText(value, 500);
+  const v = sanitizeText(value, 500);
 
   if (containsDangerousPattern(v)) {
     return { ok: false, msg: "Le note contengono testo non consentito." };
@@ -651,54 +626,106 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function formatPublicDayLabel(dayISO) {
-  const d = new Date(dayISO + "T00:00:00");
+function getNextDateForWeekday(targetWeekday) {
+  const today = new Date();
 
-  return d.toLocaleDateString("it-IT", {
-    weekday: "long",
-    day: "2-digit",
-    month: "2-digit"
-  });
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+
+    if (d.getDay() === targetWeekday) {
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+  }
+
+  return todayISO();
+}
+
+function findNextItalianHolidayISO() {
+  const today = new Date();
+
+  for (let i = 0; i < 370; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+
+    const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    if (isItalianHoliday(iso)) {
+      return iso;
+    }
+  }
+
+  return null;
 }
 
 function formatPublicService(rule) {
-  if (!rule) return "Non disponibile";
-
-  if (rule.closed) {
-    return "Chiuso";
+  if (!rule || rule.closed) {
+    return "chiuso";
   }
 
   const openTime = String(rule.open_time || "").slice(0, 5);
   const closeTime = String(rule.close_time || "").slice(0, 5);
 
   if (!openTime || !closeTime) {
-    return "Non disponibile";
+    return "chiuso";
   }
 
-  return `${openTime}–${closeTime}`;
+  return `${openTime}-${closeTime}`;
 }
 
 function renderPublicHours() {
   if (!publicHoursList) return;
 
+  const days = [
+    { label: "Lunedì", weekday: 1 },
+    { label: "Martedì", weekday: 2 },
+    { label: "Mercoledì", weekday: 3 },
+    { label: "Giovedì", weekday: 4 },
+    { label: "Venerdì", weekday: 5 },
+    { label: "Sabato", weekday: 6 },
+    { label: "Domenica", weekday: 0 }
+  ];
+
   const rows = [];
 
-  for (let i = 0; i < 7; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
+  rows.push(`
+    <div class="hours-row">
+      <span>Giorno</span>
+      <span>Pranzo / Cena</span>
+    </div>
+  `);
 
-    const dayISO = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  for (const day of days) {
+    const dayISO = getNextDateForWeekday(day.weekday);
 
     const lunchRule = getServiceRuleForDay(dayISO, "pranzo");
     const dinnerRule = getServiceRuleForDay(dayISO, "cena");
 
     rows.push(`
       <div class="hours-row">
-        <span>${escapeHtml(formatPublicDayLabel(dayISO))}</span>
-        <span>
-          Pranzo ${escapeHtml(formatPublicService(lunchRule))}
-          · Cena ${escapeHtml(formatPublicService(dinnerRule))}
-        </span>
+        <span>${escapeHtml(day.label)}</span>
+        <span>${escapeHtml(formatPublicService(lunchRule))} / ${escapeHtml(formatPublicService(dinnerRule))}</span>
+      </div>
+    `);
+  }
+
+  const nextHolidayISO = findNextItalianHolidayISO();
+
+  if (nextHolidayISO) {
+    const holidayLunchRule = getServiceRuleForDay(nextHolidayISO, "pranzo");
+    const holidayDinnerRule = getServiceRuleForDay(nextHolidayISO, "cena");
+
+    rows.push(`
+      <div class="hours-row">
+        <span>Festivi</span>
+        <span>${escapeHtml(formatPublicService(holidayLunchRule))} / ${escapeHtml(formatPublicService(holidayDinnerRule))}</span>
+      </div>
+    `);
+  } else {
+    rows.push(`
+      <div class="hours-row">
+        <span>Festivi</span>
+        <span>chiuso / chiuso</span>
       </div>
     `);
   }
@@ -706,7 +733,7 @@ function renderPublicHours() {
   publicHoursList.innerHTML = rows.join("");
 
   if (publicHoursNote) {
-    publicHoursNote.textContent = "Gli orari sono aggiornati automaticamente dal calendario del ristorante.";
+    publicHoursNote.textContent = "";
   }
 }
 
