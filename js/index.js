@@ -5,7 +5,8 @@ const statusBox = document.getElementById("bookingStatus");
 const dateEl = document.getElementById("date");
 const turnoEl = document.getElementById("turno");
 const timeEl = document.getElementById("time");
-
+const publicHoursList = document.getElementById("publicHoursList");
+const publicHoursNote = document.getElementById("publicHoursNote");
 const eventsSection = document.getElementById("eventsSection");
 const eventCardsWrap = document.getElementById("eventCardsWrap");
 
