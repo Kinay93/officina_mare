@@ -5,14 +5,16 @@ const statusBox = document.getElementById("bookingStatus");
 const dateEl = document.getElementById("date");
 const turnoEl = document.getElementById("turno");
 const timeEl = document.getElementById("time");
-const publicHoursList = document.getElementById("publicHoursList");
-const publicHoursNote = document.getElementById("publicHoursNote");
+
 const eventsSection = document.getElementById("eventsSection");
 const eventCardsWrap = document.getElementById("eventCardsWrap");
 
 const dayMenuPanel = document.getElementById("dayMenuPanel");
 const dayMenuContent = document.getElementById("dayMenuContent");
 const toggleDayMenuBtn = document.getElementById("toggleDayMenuBtn");
+
+const publicHoursList = document.getElementById("publicHoursList");
+const publicHoursNote = document.getElementById("publicHoursNote");
 
 let closedServiceMap = new Map();
 let rulesCache = [];
@@ -38,7 +40,7 @@ function toMinutes(hhmm) {
   const [h, m] = clean.split(":").map(Number);
 
   if (!Number.isFinite(h) || !Number.isFinite(m)) {
-    return 0;
+    return null;
   }
 
   return h * 60 + m;
@@ -57,7 +59,12 @@ function buildSlots(start, end, step) {
   const endMinutes = toMinutes(end);
   const safeStep = Number(step || 15);
 
-  if (!startMinutes || !endMinutes || endMinutes < startMinutes || safeStep <= 0) {
+  if (
+    startMinutes === null ||
+    endMinutes === null ||
+    endMinutes < startMinutes ||
+    safeStep <= 0
+  ) {
     return slots;
   }
 
@@ -229,25 +236,25 @@ function getRuleForDay(dayISO, rules) {
 }
 
 function getDefaultServiceRuleForDay(dayISO, service) {
-  const isDinner = service === "dinner";
-
   if (isMonday(dayISO)) {
     return {
-      open_time: isDinner ? "18:30" : "12:30",
-      close_time: isDinner ? "23:00" : "15:00",
+      open_time: service === "dinner" ? "18:30" : "12:30",
+      close_time: service === "dinner" ? "23:00" : "15:00",
       slot_step: 15,
       closed: true,
-      reason: "Il lunedì il ristorante è chiuso."
+      reason: "Il lunedì il ristorante è chiuso.",
+      source: "default"
     };
   }
 
-  if (isSunday(dayISO) && isDinner) {
+  if (isSunday(dayISO) && service === "dinner") {
     return {
       open_time: "18:30",
       close_time: "23:00",
       slot_step: 15,
       closed: true,
-      reason: "La domenica sera non è disponibile."
+      reason: "La domenica sera non è disponibile.",
+      source: "default"
     };
   }
 
@@ -257,7 +264,8 @@ function getDefaultServiceRuleForDay(dayISO, service) {
       close_time: "23:00",
       slot_step: 15,
       closed: false,
-      reason: ""
+      reason: "",
+      source: "default"
     };
   }
 
@@ -266,14 +274,15 @@ function getDefaultServiceRuleForDay(dayISO, service) {
     close_time: "15:00",
     slot_step: 15,
     closed: false,
-    reason: ""
+    reason: "",
+    source: "default"
   };
 }
 
 function ruleMatchesDay(rule, dayISO, service) {
   if (!rule) return false;
-
   if (rule.service !== service) return false;
+
   if (rule.start_day && rule.start_day > dayISO) return false;
   if (rule.end_day && rule.end_day < dayISO) return false;
 
@@ -285,8 +294,7 @@ function ruleMatchesDay(rule, dayISO, service) {
   }
 
   if (scope === "all") return true;
-  if (scope === "all_lunch" && service === "lunch") return true;
-  if (scope === "all_dinner" && service === "dinner") return true;
+  if (scope === "custom") return true;
   if (scope === "weekday") return true;
   if (scope === "weekdays") return weekday >= 1 && weekday <= 5;
   if (scope === "working_days") return isWorkingDay(dayISO);
@@ -294,7 +302,6 @@ function ruleMatchesDay(rule, dayISO, service) {
   if (scope === "holiday") return isHolidayOrSunday(dayISO);
   if (scope === "holidays") return isHolidayOrSunday(dayISO);
   if (scope === "festivi") return isHolidayOrSunday(dayISO);
-  if (scope === "custom") return true;
 
   return true;
 }
@@ -320,8 +327,13 @@ function getServiceRuleForDay(dayISO, turno) {
       continue;
     }
 
-    if (rulePriority === selectedPriority && String(rule.start_day || "") >= String(selected.start_day || "")) {
-      selected = rule;
+    if (rulePriority === selectedPriority) {
+      const selectedStart = String(selected.start_day || "");
+      const ruleStart = String(rule.start_day || "");
+
+      if (ruleStart >= selectedStart) {
+        selected = rule;
+      }
     }
   }
 
@@ -336,7 +348,9 @@ function getServiceRuleForDay(dayISO, turno) {
     closed: !!selected.closed,
     reason: selected.closed
       ? (selected.note || "Questo servizio non è prenotabile.")
-      : ""
+      : "",
+    source: "rule",
+    rule_id: selected.id
   };
 }
 
@@ -635,6 +649,65 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function formatPublicDayLabel(dayISO) {
+  const d = new Date(dayISO + "T00:00:00");
+
+  return d.toLocaleDateString("it-IT", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit"
+  });
+}
+
+function formatPublicService(rule) {
+  if (!rule) return "Non disponibile";
+
+  if (rule.closed) {
+    return "Chiuso";
+  }
+
+  const openTime = String(rule.open_time || "").slice(0, 5);
+  const closeTime = String(rule.close_time || "").slice(0, 5);
+
+  if (!openTime || !closeTime) {
+    return "Non disponibile";
+  }
+
+  return `${openTime}–${closeTime}`;
+}
+
+function renderPublicHours() {
+  if (!publicHoursList) return;
+
+  const rows = [];
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+
+    const dayISO = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    const lunchRule = getServiceRuleForDay(dayISO, "pranzo");
+    const dinnerRule = getServiceRuleForDay(dayISO, "cena");
+
+    rows.push(`
+      <div class="hours-row">
+        <span>${escapeHtml(formatPublicDayLabel(dayISO))}</span>
+        <span>
+          Pranzo ${escapeHtml(formatPublicService(lunchRule))}
+          · Cena ${escapeHtml(formatPublicService(dinnerRule))}
+        </span>
+      </div>
+    `);
+  }
+
+  publicHoursList.innerHTML = rows.join("");
+
+  if (publicHoursNote) {
+    publicHoursNote.textContent = "Gli orari sono aggiornati automaticamente dal calendario del ristorante.";
+  }
 }
 
 function getEventServiceFromTime(startTime) {
@@ -1009,11 +1082,7 @@ form?.addEventListener("submit", async (e) => {
 
     if (error) throw error;
 
-    console.log("Prenotazione salvata");
-
     try {
-      console.log("Invio richiesta mail...");
-
       const { data: mailData, error: mailError } = await supabase.functions.invoke("notify-booking", {
         body: {
           reservation_id: null,
@@ -1043,6 +1112,7 @@ form?.addEventListener("submit", async (e) => {
 
     await loadClosedServicesForNextYear();
     await loadServiceRulesForNextYear();
+    renderPublicHours();
     await loadEvents();
   } catch (err) {
     showError("Errore invio: " + (err?.message || err));
@@ -1055,4 +1125,5 @@ if (dateEl) {
 
 await loadClosedServicesForNextYear();
 await loadServiceRulesForNextYear();
+renderPublicHours();
 await loadEvents();
