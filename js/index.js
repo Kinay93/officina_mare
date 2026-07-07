@@ -15,6 +15,7 @@ const toggleDayMenuBtn = document.getElementById("toggleDayMenuBtn");
 
 let closedServiceMap = new Map();
 let rulesCache = [];
+let serviceRulesCache = [];
 
 function pad(n) {
   return String(n).padStart(2, "0");
@@ -32,7 +33,13 @@ function addDaysISO(days) {
 }
 
 function toMinutes(hhmm) {
-  const [h, m] = hhmm.split(":").map(Number);
+  const clean = String(hhmm || "").slice(0, 5);
+  const [h, m] = clean.split(":").map(Number);
+
+  if (!Number.isFinite(h) || !Number.isFinite(m)) {
+    return 0;
+  }
+
   return h * 60 + m;
 }
 
@@ -44,14 +51,21 @@ function fromMinutes(total) {
 
 function buildSlots(start, end, step) {
   const slots = [];
-  for (let t = toMinutes(start); t <= toMinutes(end); t += step) {
+
+  const startMinutes = toMinutes(start);
+  const endMinutes = toMinutes(end);
+  const safeStep = Number(step || 15);
+
+  if (!startMinutes || !endMinutes || endMinutes < startMinutes || safeStep <= 0) {
+    return slots;
+  }
+
+  for (let t = startMinutes; t <= endMinutes; t += safeStep) {
     slots.push(fromMinutes(t));
   }
+
   return slots;
 }
-
-const lunchSlots = buildSlots("12:30", "15:00", 15);
-const dinnerSlots = buildSlots("18:30", "23:00", 15);
 
 function normalizeDateToISO(value) {
   if (!value) return "";
@@ -113,6 +127,81 @@ function normalizeDateToISO(value) {
   return "";
 }
 
+function getLocalDateFromISO(dayISO) {
+  return new Date(dayISO + "T00:00:00");
+}
+
+function getWeekday(dayISO) {
+  return getLocalDateFromISO(dayISO).getDay();
+}
+
+function isMonday(dateStr) {
+  if (!dateStr) return false;
+  return getWeekday(dateStr) === 1;
+}
+
+function isSunday(dateStr) {
+  if (!dateStr) return false;
+  return getWeekday(dateStr) === 0;
+}
+
+function getEasterDate(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+
+  return new Date(year, month - 1, day);
+}
+
+function isItalianHoliday(dayISO) {
+  const d = getLocalDateFromISO(dayISO);
+  const year = d.getFullYear();
+  const mmdd = `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  const fixedHolidays = new Set([
+    "01-01",
+    "01-06",
+    "04-25",
+    "05-01",
+    "06-02",
+    "06-29",
+    "08-15",
+    "11-01",
+    "12-08",
+    "12-25",
+    "12-26"
+  ]);
+
+  if (fixedHolidays.has(mmdd)) return true;
+
+  const easter = getEasterDate(year);
+  const easterMonday = new Date(easter);
+  easterMonday.setDate(easter.getDate() + 1);
+
+  const easterMondayISO = `${easterMonday.getFullYear()}-${pad(easterMonday.getMonth() + 1)}-${pad(easterMonday.getDate())}`;
+
+  return dayISO === easterMondayISO;
+}
+
+function isHolidayOrSunday(dayISO) {
+  return isSunday(dayISO) || isItalianHoliday(dayISO);
+}
+
+function isWorkingDay(dayISO) {
+  return !isHolidayOrSunday(dayISO);
+}
+
 function defaultMaxCoversForMonth(monthIndex) {
   return [4, 5, 6, 7, 8].includes(monthIndex) ? 60 : 40;
 }
@@ -132,9 +221,122 @@ function getRuleForDay(dayISO, rules) {
     };
   }
 
-  const monthIndex = new Date(dayISO + "T00:00:00").getMonth();
+  const monthIndex = getLocalDateFromISO(dayISO).getMonth();
   const d = defaultMaxCoversForMonth(monthIndex);
+
   return { lunch: d, dinner: d };
+}
+
+function getDefaultServiceRuleForDay(dayISO, service) {
+  const isDinner = service === "dinner";
+
+  if (isMonday(dayISO)) {
+    return {
+      open_time: isDinner ? "18:30" : "12:30",
+      close_time: isDinner ? "23:00" : "15:00",
+      slot_step: 15,
+      closed: true,
+      reason: "Il lunedì il ristorante è chiuso."
+    };
+  }
+
+  if (isSunday(dayISO) && isDinner) {
+    return {
+      open_time: "18:30",
+      close_time: "23:00",
+      slot_step: 15,
+      closed: true,
+      reason: "La domenica sera non è disponibile."
+    };
+  }
+
+  if (service === "dinner") {
+    return {
+      open_time: "18:30",
+      close_time: "23:00",
+      slot_step: 15,
+      closed: false,
+      reason: ""
+    };
+  }
+
+  return {
+    open_time: "12:30",
+    close_time: "15:00",
+    slot_step: 15,
+    closed: false,
+    reason: ""
+  };
+}
+
+function ruleMatchesDay(rule, dayISO, service) {
+  if (!rule) return false;
+
+  if (rule.service !== service) return false;
+  if (rule.start_day && rule.start_day > dayISO) return false;
+  if (rule.end_day && rule.end_day < dayISO) return false;
+
+  const weekday = getWeekday(dayISO);
+  const scope = String(rule.scope || "custom").toLowerCase();
+
+  if (rule.weekday !== null && rule.weekday !== undefined && rule.weekday !== "") {
+    return Number(rule.weekday) === weekday;
+  }
+
+  if (scope === "all") return true;
+  if (scope === "all_lunch" && service === "lunch") return true;
+  if (scope === "all_dinner" && service === "dinner") return true;
+  if (scope === "weekday") return true;
+  if (scope === "weekdays") return weekday >= 1 && weekday <= 5;
+  if (scope === "working_days") return isWorkingDay(dayISO);
+  if (scope === "feriali") return isWorkingDay(dayISO);
+  if (scope === "holiday") return isHolidayOrSunday(dayISO);
+  if (scope === "holidays") return isHolidayOrSunday(dayISO);
+  if (scope === "festivi") return isHolidayOrSunday(dayISO);
+  if (scope === "custom") return true;
+
+  return true;
+}
+
+function getServiceRuleForDay(dayISO, turno) {
+  const service = turno === "cena" || turno === "dinner" ? "dinner" : "lunch";
+
+  let selected = null;
+
+  for (const rule of serviceRulesCache) {
+    if (!ruleMatchesDay(rule, dayISO, service)) continue;
+
+    if (!selected) {
+      selected = rule;
+      continue;
+    }
+
+    const selectedPriority = Number(selected.priority || 0);
+    const rulePriority = Number(rule.priority || 0);
+
+    if (rulePriority > selectedPriority) {
+      selected = rule;
+      continue;
+    }
+
+    if (rulePriority === selectedPriority && String(rule.start_day || "") >= String(selected.start_day || "")) {
+      selected = rule;
+    }
+  }
+
+  const fallback = getDefaultServiceRuleForDay(dayISO, service);
+
+  if (!selected) return fallback;
+
+  return {
+    open_time: selected.open_time || fallback.open_time,
+    close_time: selected.close_time || fallback.close_time,
+    slot_step: Number(selected.slot_step || fallback.slot_step || 15),
+    closed: !!selected.closed,
+    reason: selected.closed
+      ? (selected.note || "Questo servizio non è prenotabile.")
+      : ""
+  };
 }
 
 async function loadClosedServicesForNextYear() {
@@ -147,6 +349,7 @@ async function loadClosedServicesForNextYear() {
       .select("day, lunch_closed, dinner_closed, lunch_max_covers, dinner_max_covers")
       .gte("day", fromISO)
       .lte("day", toISO),
+
     supabase
       .from("booking_rules")
       .select("*")
@@ -170,16 +373,24 @@ async function loadClosedServicesForNextYear() {
   });
 }
 
-function isMonday(dateStr) {
-  if (!dateStr) return false;
-  const d = new Date(dateStr + "T00:00:00");
-  return d.getDay() === 1;
-}
+async function loadServiceRulesForNextYear() {
+  const fromISO = todayISO();
+  const toISO = addDaysISO(365);
 
-function isSunday(dateStr) {
-  if (!dateStr) return false;
-  const d = new Date(dateStr + "T00:00:00");
-  return d.getDay() === 0;
+  const { data, error } = await supabase
+    .from("booking_service_rules")
+    .select("*")
+    .lte("start_day", toISO)
+    .or(`end_day.is.null,end_day.gte.${fromISO}`)
+    .order("start_day", { ascending: true });
+
+  if (error) {
+    console.warn("Regole orarie non caricate. Uso orari predefiniti:", error.message);
+    serviceRulesCache = [];
+    return;
+  }
+
+  serviceRulesCache = data || [];
 }
 
 function getServiceState(dateStr, turno) {
@@ -196,13 +407,17 @@ function getServiceState(dateStr, turno) {
   if (turno === "cena") {
     return {
       closed: !!row.dinner_closed,
-      max: Number(base.dinner)
+      max: row.dinner_max_covers !== null && row.dinner_max_covers !== undefined
+        ? Number(row.dinner_max_covers)
+        : Number(base.dinner)
     };
   }
 
   return {
     closed: !!row.lunch_closed,
-    max: Number(base.lunch)
+    max: row.lunch_max_covers !== null && row.lunch_max_covers !== undefined
+      ? Number(row.lunch_max_covers)
+      : Number(base.lunch)
   };
 }
 
@@ -237,6 +452,15 @@ async function getCurrentBookedCovers(dateStr, turno) {
 }
 
 async function isBlockedOrFull(dateStr, turno) {
+  const serviceRule = getServiceRuleForDay(dateStr, turno);
+
+  if (serviceRule.closed) {
+    return {
+      blocked: true,
+      reason: serviceRule.reason || "Questo servizio non è prenotabile."
+    };
+  }
+
   const serviceState = getServiceState(dateStr, turno);
 
   if (serviceState.closed) {
@@ -271,24 +495,31 @@ async function refreshSlots() {
 
   if (!normalizedDate || !turno) return;
 
-  if (isMonday(normalizedDate)) {
-    timeEl.innerHTML = `<option value="">Lunedì chiuso</option>`;
-    return;
-  }
-
-  if (isSunday(normalizedDate) && turno === "cena") {
-    timeEl.innerHTML = `<option value="">Domenica sera non disponibile</option>`;
-    return;
-  }
-
   const state = await isBlockedOrFull(normalizedDate, turno);
 
   if (state.blocked) {
-    timeEl.innerHTML = `<option value="">${state.reason}</option>`;
+    timeEl.innerHTML = `<option value="">${escapeHtml(state.reason)}</option>`;
     return;
   }
 
-  const slots = turno === "pranzo" ? lunchSlots : dinnerSlots;
+  const serviceRule = getServiceRuleForDay(normalizedDate, turno);
+
+  if (serviceRule.closed) {
+    timeEl.innerHTML = `<option value="">${escapeHtml(serviceRule.reason || "Servizio chiuso")}</option>`;
+    return;
+  }
+
+  const openTime = String(serviceRule.open_time || "").slice(0, 5);
+  const closeTime = String(serviceRule.close_time || "").slice(0, 5);
+  const step = Number(serviceRule.slot_step || 15);
+
+  const slots = buildSlots(openTime, closeTime, step);
+
+  if (!slots.length) {
+    timeEl.innerHTML = `<option value="">Nessun orario disponibile</option>`;
+    return;
+  }
+
   timeEl.innerHTML = `<option value="">Seleziona orario</option>` + slots.map(slot => `
     <option value="${slot}">${slot}</option>
   `).join("");
@@ -304,6 +535,7 @@ function stripHtml(value) {
 
 function containsDangerousPattern(value) {
   const v = String(value || "").toLowerCase();
+
   return (
     v.includes("<script") ||
     v.includes("</script") ||
@@ -330,11 +562,14 @@ function sanitizeText(value, maxLen = 120) {
 
 function validateName(value) {
   const v = sanitizeText(value, 80);
+
   if (!v) return { ok: false, msg: "Inserisci il nome." };
   if (containsDangerousPattern(v)) return { ok: false, msg: "Nome non valido." };
+
   if (!/^[A-Za-zÀ-ÖØ-öø-ÿ''.\- ]{2,80}$/.test(v)) {
     return { ok: false, msg: "Il nome contiene caratteri non validi." };
   }
+
   return { ok: true, value: v };
 }
 
@@ -344,6 +579,7 @@ function validatePhone(value) {
 
   if (!v) return { ok: false, msg: "Inserisci il telefono." };
   if (containsDangerousPattern(v)) return { ok: false, msg: "Telefono non valido." };
+
   if (!/^\+?[0-9 ]{6,20}$/.test(v)) {
     return { ok: false, msg: "Numero di telefono non valido." };
   }
@@ -368,9 +604,11 @@ function validateEmail(value) {
 
 function validateNotes(value) {
   let v = sanitizeText(value, 500);
+
   if (containsDangerousPattern(v)) {
     return { ok: false, msg: "Le note contengono testo non consentito." };
   }
+
   return { ok: true, value: v };
 }
 
@@ -384,6 +622,11 @@ function showOk(msg) {
   statusBox.textContent = msg;
 }
 
+function clearStatus() {
+  statusBox.className = "booking-status";
+  statusBox.textContent = "";
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -391,6 +634,85 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function getEventServiceFromTime(startTime) {
+  const clean = String(startTime || "").slice(0, 5);
+
+  if (!clean || !clean.includes(":")) {
+    return "pranzo";
+  }
+
+  const hour = Number(clean.split(":")[0]);
+
+  if (Number.isFinite(hour) && hour >= 18) {
+    return "cena";
+  }
+
+  return "pranzo";
+}
+
+function setTimeIfAvailableOrAppend(timeValue) {
+  const cleanTime = String(timeValue || "").slice(0, 5);
+
+  if (!cleanTime || !/^\d{2}:\d{2}$/.test(cleanTime)) return;
+
+  const options = Array.from(timeEl.options || []);
+  const exists = options.some(opt => opt.value === cleanTime);
+
+  if (exists) {
+    timeEl.value = cleanTime;
+    return;
+  }
+
+  const hasUsableOptions = options.some(opt => opt.value && opt.value.includes(":"));
+
+  if (hasUsableOptions) {
+    const option = document.createElement("option");
+    option.value = cleanTime;
+    option.textContent = `${cleanTime} - orario evento`;
+    timeEl.appendChild(option);
+    timeEl.value = cleanTime;
+  }
+}
+
+async function handleEventBooking(btn) {
+  const eventDate = normalizeDateToISO(btn.dataset.date || "");
+  const eventTime = String(btn.dataset.time || "").slice(0, 5);
+  const eventService = btn.dataset.service || getEventServiceFromTime(eventTime);
+
+  if (!eventDate) {
+    showError("Data evento non valida.");
+    return;
+  }
+
+  dateEl.value = eventDate;
+  turnoEl.value = eventService;
+
+  clearStatus();
+
+  await refreshSlots();
+
+  if (eventTime) {
+    setTimeIfAvailableOrAppend(eventTime);
+  }
+
+  const eventTitle = btn.dataset.title || "";
+
+  if (eventTitle) {
+    const notesEl = document.getElementById("notes");
+    const currentNotes = normalizeSpaces(notesEl.value || "");
+    const eventNote = `Evento: ${eventTitle}`;
+
+    if (!currentNotes.toLowerCase().includes(eventNote.toLowerCase())) {
+      notesEl.value = currentNotes ? `${eventNote} | ${currentNotes}` : eventNote;
+    }
+  }
+
+  document.querySelector(".booking-card")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
 }
 
 document.getElementById("notes")?.addEventListener("input", (e) => {
@@ -414,15 +736,14 @@ dateEl?.addEventListener("change", async () => {
 
   if (normalizedDate && turnoEl.value) {
     const state = await isBlockedOrFull(normalizedDate, turnoEl.value);
+
     if (state.blocked) {
       showError(state.reason);
     } else {
-      statusBox.className = "booking-status";
-      statusBox.textContent = "";
+      clearStatus();
     }
   } else {
-    statusBox.className = "booking-status";
-    statusBox.textContent = "";
+    clearStatus();
   }
 
   await refreshSlots();
@@ -433,18 +754,24 @@ turnoEl?.addEventListener("change", async () => {
 
   if (normalizedDate && turnoEl.value) {
     const state = await isBlockedOrFull(normalizedDate, turnoEl.value);
+
     if (state.blocked) {
       showError(state.reason);
     } else {
-      statusBox.className = "booking-status";
-      statusBox.textContent = "";
+      clearStatus();
     }
   } else {
-    statusBox.className = "booking-status";
-    statusBox.textContent = "";
+    clearStatus();
   }
 
   await refreshSlots();
+});
+
+form?.addEventListener("reset", () => {
+  setTimeout(() => {
+    timeEl.innerHTML = `<option value="">Seleziona prima data e turno</option>`;
+    clearStatus();
+  }, 0);
 });
 
 toggleDayMenuBtn?.addEventListener("click", async () => {
@@ -502,37 +829,79 @@ async function loadEvents() {
   eventsSection?.classList.add("show");
 
   if (eventCardsWrap) {
-    eventCardsWrap.innerHTML = eventsData.map((ev, index) => `
-      <article class="event-card-mini" data-event-index="${index}">
-        <img
-          class="event-card-cover"
-          src="${escapeHtml(ev.image_url || "assets/fondo.webp")}"
-          alt="${escapeHtml(ev.title || "Evento")}"
-        >
-        <div class="event-card-body">
-          <div class="event-card-date">
-            📅 ${escapeHtml(ev.start_date)}${ev.end_date && ev.end_date !== ev.start_date ? " → " + escapeHtml(ev.end_date) : ""}
-            ${ev.start_time ? " · 🕒 " + escapeHtml(String(ev.start_time).slice(0, 5)) : ""}
+    eventCardsWrap.innerHTML = eventsData.map((ev, index) => {
+      const startDate = normalizeDateToISO(ev.start_date || "");
+      const endDate = normalizeDateToISO(ev.end_date || ev.start_date || "");
+      const startTime = ev.start_time ? String(ev.start_time).slice(0, 5) : "";
+      const endTime = ev.end_time ? String(ev.end_time).slice(0, 5) : "";
+      const service = getEventServiceFromTime(startTime);
+      const title = ev.title || "Evento";
+      const description = ev.description || "Dettagli evento disponibili a breve.";
+      const preview = description.slice(0, 90);
+      const dateText = `${startDate}${endDate && endDate !== startDate ? " → " + endDate : ""}`;
+      const timeText = startTime ? ` · 🕒 ${startTime}${endTime ? " - " + endTime : ""}` : "";
+
+      return `
+        <article class="event-card-mini" data-event-index="${index}">
+          <img
+            class="event-card-cover"
+            src="${escapeHtml(ev.image_url || "assets/fondo.webp")}"
+            alt="${escapeHtml(title)}"
+          >
+          <div class="event-card-body">
+            <div class="event-card-date">
+              📅 ${escapeHtml(dateText)}${escapeHtml(timeText)}
+            </div>
+
+            <div class="event-card-title">${escapeHtml(title)}</div>
+
+            <div class="event-card-preview">
+              ${escapeHtml(preview)}
+              ${description.length > 90 ? "..." : ""}
+            </div>
+
+            <div class="event-card-full">
+              ${escapeHtml(description)}
+
+              <div class="event-card-actions">
+                <button
+                  type="button"
+                  class="btn btn-primary btn-book-event"
+                  data-date="${escapeHtml(startDate)}"
+                  data-time="${escapeHtml(startTime)}"
+                  data-service="${escapeHtml(service)}"
+                  data-title="${escapeHtml(title)}"
+                >
+                  Prenota evento
+                </button>
+              </div>
+            </div>
           </div>
-          <div class="event-card-title">${escapeHtml(ev.title || "Evento")}</div>
-          <div class="event-card-preview">
-            ${escapeHtml((ev.description || "Dettagli evento disponibili a breve.").slice(0, 90))}
-            ${(ev.description || "").length > 90 ? "..." : ""}
-          </div>
-          <div class="event-card-full">
-            ${escapeHtml(ev.description || "Dettagli evento disponibili a breve.")}
-          </div>
-        </div>
-      </article>
-    `).join("");
+        </article>
+      `;
+    }).join("");
 
     document.querySelectorAll(".event-card-mini").forEach(card => {
-      card.addEventListener("click", () => {
+      card.addEventListener("click", (e) => {
+        if (e.target.closest(".btn-book-event")) return;
         card.classList.toggle("open");
       });
 
-      card.addEventListener("touchstart", () => {
+      card.addEventListener("touchstart", (e) => {
+        if (e.target.closest(".btn-book-event")) return;
         card.classList.toggle("open");
+      }, { passive: true });
+    });
+
+    document.querySelectorAll(".btn-book-event").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await handleEventBooking(btn);
+      });
+
+      btn.addEventListener("touchstart", (e) => {
+        e.stopPropagation();
       }, { passive: true });
     });
   }
@@ -548,17 +917,20 @@ form?.addEventListener("submit", async (e) => {
     return;
   }
 
-  if (isMonday(normalizedDate)) {
-    showError("Il lunedì il ristorante è chiuso.");
+  if (!turnoEl.value) {
+    showError("Seleziona un turno.");
     return;
   }
 
-  if (isSunday(normalizedDate) && turnoEl.value === "cena") {
-    showError("La domenica sera non è disponibile.");
+  const serviceRule = getServiceRuleForDay(normalizedDate, turnoEl.value);
+
+  if (serviceRule.closed) {
+    showError(serviceRule.reason || "Questo servizio non è prenotabile.");
     return;
   }
 
   const serviceState = await isBlockedOrFull(normalizedDate, turnoEl.value);
+
   if (serviceState.blocked) {
     showError(serviceState.reason);
     return;
@@ -594,12 +966,14 @@ form?.addEventListener("submit", async (e) => {
   }
 
   const people = Number(document.getElementById("people").value || 0);
+
   if (!people || people < 1 || people > 12) {
     showError("Numero persone non valido.");
     return;
   }
 
   const bookedAfterInsert = Number(serviceState.covers || 0) + people;
+
   if (bookedAfterInsert > Number(serviceState.max || 0)) {
     showError("Con questa prenotazione il servizio supererebbe la capienza disponibile.");
     return;
@@ -664,14 +1038,20 @@ form?.addEventListener("submit", async (e) => {
 
     form.reset();
     timeEl.innerHTML = `<option value="">Seleziona prima data e turno</option>`;
-    showOk("la prenotazione verrà confermata via mail");
+    showOk("La prenotazione verrà confermata via mail.");
 
     await loadClosedServicesForNextYear();
+    await loadServiceRulesForNextYear();
     await loadEvents();
   } catch (err) {
     showError("Errore invio: " + (err?.message || err));
   }
 });
 
+if (dateEl) {
+  dateEl.min = todayISO();
+}
+
 await loadClosedServicesForNextYear();
+await loadServiceRulesForNextYear();
 await loadEvents();
