@@ -268,8 +268,20 @@
 
     .event-card-mini:hover .event-card-full,
     .event-card-mini.open .event-card-full{
-      max-height:280px;
+      max-height:320px;
       margin-top:12px;
+    }
+
+    .event-card-actions{
+      margin-top:14px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .event-card-actions .btn{
+      width:100%;
+      justify-content:center;
     }
 
     .info-card{
@@ -417,13 +429,23 @@
   </section>
 
   <div class="booking-wrap">
+
+    <section class="events-card" id="eventsSection">
+      <div class="events-head">
+        <div>
+          <h3 style="margin:0;">Eventi</h3>
+          <p style="margin:8px 0 0;color:var(--muted);">Scopri gli eventi del giorno, della settimana o del mese.</p>
+        </div>
+      </div>
+
+      <div id="eventCardsWrap"></div>
+    </section>
+
     <section class="booking-card">
       <h2>Prenotazione</h2>
       <p>
-        Orari prenotabili: <br>
-        Lunedì chiuso <br>
-        Martedì-Sabato 12:30/15:00 - 18:30/23:00 <br>
-        Domenica 12:30/15:00 <br>
+        Seleziona data, turno e orario disponibile. <br>
+        Gli orari prenotabili possono variare in base al calendario del ristorante.
       </p>
 
       <form id="bookingForm">
@@ -497,17 +519,6 @@
 
         <div id="bookingStatus" class="booking-status"></div>
       </form>
-    </section>
-
-    <section class="events-card" id="eventsSection">
-      <div class="events-head">
-        <div>
-          <h3 style="margin:0;">Eventi</h3>
-          <p style="margin:8px 0 0;color:var(--muted);">Scopri gli eventi del giorno, della settimana o del mese.</p>
-        </div>
-      </div>
-
-      <div id="eventCardsWrap"></div>
     </section>
 
     <section class="info-card">
