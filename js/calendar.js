@@ -2,29 +2,26 @@ import supabase from "./supabase-client.js";
 
 const drawer = document.getElementById("drawer");
 const drawerOverlay = document.getElementById("drawerOverlay");
+
 const calendarGrid = document.getElementById("calendarGrid");
 const calendarMonthTitle = document.getElementById("calendarMonthTitle");
 const calendarStatus = document.getElementById("calendarStatus");
 
-const serviceRuleForm = document.getElementById("serviceRuleForm");
 const serviceRulesStatus = document.getElementById("serviceRulesStatus");
 const serviceRulesList = document.getElementById("serviceRulesList");
 
-const ruleStartDay = document.getElementById("ruleStartDay");
-const ruleEndDay = document.getElementById("ruleEndDay");
-const ruleService = document.getElementById("ruleService");
-const ruleClosed = document.getElementById("ruleClosed");
-const ruleScope = document.getElementById("ruleScope");
-const ruleWeekday = document.getElementById("ruleWeekday");
-const ruleOpenTime = document.getElementById("ruleOpenTime");
-const ruleCloseTime = document.getElementById("ruleCloseTime");
-const ruleSlotStep = document.getElementById("ruleSlotStep");
-const rulePriority = document.getElementById("rulePriority");
-const ruleNote = document.getElementById("ruleNote");
+const dayRuleModal = document.getElementById("dayRuleModal");
+const dayRuleModalBackdrop = document.getElementById("dayRuleModalBackdrop");
+const dayRuleModalClose = document.getElementById("dayRuleModalClose");
+const dayRuleModalTitle = document.getElementById("dayRuleModalTitle");
+const dayRuleModalSubtitle = document.getElementById("dayRuleModalSubtitle");
+const modalLunchToggle = document.getElementById("modalLunchToggle");
+const modalDinnerToggle = document.getElementById("modalDinnerToggle");
 
 let currentMonthDate = new Date();
 let busy = false;
 let serviceRulesCache = [];
+let activeModalTarget = null;
 
 async function requireAuth() {
   const { data, error } = await supabase.auth.getSession();
@@ -81,31 +78,10 @@ function toISODate(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function normalizeDateToISO(value) {
-  if (!value) return "";
-
-  const raw = String(value).trim();
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    return raw;
-  }
-
-  let m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) {
-    return `${m[3]}-${pad(Number(m[2]))}-${pad(Number(m[1]))}`;
-  }
-
-  m = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-  if (m) {
-    return `${m[3]}-${pad(Number(m[2]))}-${pad(Number(m[1]))}`;
-  }
-
-  const parsed = new Date(raw);
-  if (!Number.isNaN(parsed.getTime())) {
-    return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`;
-  }
-
-  return "";
+function addDaysISO(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return toISODate(d);
 }
 
 function getLocalDateFromISO(dayISO) {
@@ -127,15 +103,6 @@ function monthBounds(date) {
   const first = new Date(date.getFullYear(), date.getMonth(), 1);
   const last = new Date(date.getFullYear(), date.getMonth() + 1, 0);
   return { first, last };
-}
-
-function toMinutes(hhmm) {
-  const clean = String(hhmm || "").slice(0, 5);
-  const [h, m] = clean.split(":").map(Number);
-
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
-
-  return h * 60 + m;
 }
 
 function escapeHtml(value) {
@@ -172,7 +139,10 @@ function getRuleForDay(dayISO, rules) {
   const monthIndex = getLocalDateFromISO(dayISO).getMonth();
   const base = defaultCapForMonth(monthIndex);
 
-  return { lunch: base, dinner: base };
+  return {
+    lunch: base,
+    dinner: base
+  };
 }
 
 function getEasterDate(year) {
@@ -222,43 +192,41 @@ function isItalianHoliday(dayISO) {
   return dayISO === toISODate(easterMonday);
 }
 
-function isSunday(dayISO) {
-  return getWeekday(dayISO) === 0;
-}
-
 function isMonday(dayISO) {
   return getWeekday(dayISO) === 1;
 }
 
-function isHolidayOrSunday(dayISO) {
-  return isSunday(dayISO) || isItalianHoliday(dayISO);
-}
-
-function isWorkingDay(dayISO) {
-  return !isHolidayOrSunday(dayISO);
+function isSunday(dayISO) {
+  return getWeekday(dayISO) === 0;
 }
 
 function getDefaultServiceRuleForDay(dayISO, service) {
-  if (isMonday(dayISO)) {
-    return {
-      open_time: service === "dinner" ? "18:30" : "12:30",
-      close_time: service === "dinner" ? "23:00" : "15:00",
-      slot_step: 15,
-      closed: true,
-      reason: "Lunedì chiuso",
-      source: "default"
-    };
-  }
+  /*
+    Se è festivo nazionale, viene considerato SOLO festivo.
+    Quindi non applica lunedì/domenica come regola automatica.
+  */
+  if (!isItalianHoliday(dayISO)) {
+    if (isMonday(dayISO)) {
+      return {
+        open_time: service === "dinner" ? "18:30" : "12:30",
+        close_time: service === "dinner" ? "23:00" : "15:00",
+        slot_step: 15,
+        closed: true,
+        reason: "Lunedì chiuso",
+        source: "default"
+      };
+    }
 
-  if (isSunday(dayISO) && service === "dinner") {
-    return {
-      open_time: "18:30",
-      close_time: "23:00",
-      slot_step: 15,
-      closed: true,
-      reason: "Domenica sera chiuso",
-      source: "default"
-    };
+    if (isSunday(dayISO) && service === "dinner") {
+      return {
+        open_time: "18:30",
+        close_time: "23:00",
+        slot_step: 15,
+        closed: true,
+        reason: "Domenica sera chiuso",
+        source: "default"
+      };
+    }
   }
 
   if (service === "dinner") {
@@ -289,20 +257,40 @@ function ruleMatchesDay(rule, dayISO, service) {
   if (rule.start_day && rule.start_day > dayISO) return false;
   if (rule.end_day && rule.end_day < dayISO) return false;
 
-  const weekday = getWeekday(dayISO);
   const scope = String(rule.scope || "custom").toLowerCase();
+  const isHoliday = isItalianHoliday(dayISO);
 
-  if (rule.weekday !== null && rule.weekday !== undefined && rule.weekday !== "") {
-    return Number(rule.weekday) === weekday;
+  /*
+    Se il giorno è festivo, deve rispondere solo alle regole Festivi
+    o alle regole custom su quella data precisa.
+    Non deve rispondere a lunedì/martedì/domenica.
+  */
+  if (isHoliday) {
+    if (scope === "holidays" || scope === "festivi") return true;
+
+    if (scope === "custom") {
+      return rule.start_day === dayISO && (!rule.end_day || rule.end_day === dayISO);
+    }
+
+    if (scope === "all") return true;
+
+    return false;
+  }
+
+  if (scope === "holidays" || scope === "festivi") {
+    return false;
   }
 
   if (scope === "all") return true;
-  if (scope === "custom") return true;
-  if (scope === "weekday") return true;
-  if (scope === "working_days") return isWorkingDay(dayISO);
-  if (scope === "feriali") return isWorkingDay(dayISO);
-  if (scope === "holidays") return isHolidayOrSunday(dayISO);
-  if (scope === "festivi") return isHolidayOrSunday(dayISO);
+
+  if (scope === "custom") {
+    return rule.start_day <= dayISO && (!rule.end_day || rule.end_day >= dayISO);
+  }
+
+  if (scope === "weekday") {
+    if (rule.weekday === null || rule.weekday === undefined || rule.weekday === "") return false;
+    return Number(rule.weekday) === getWeekday(dayISO);
+  }
 
   return true;
 }
@@ -330,8 +318,18 @@ function getServiceRuleForDay(dayISO, service, rules = serviceRulesCache) {
       const selectedStart = String(selected.start_day || "");
       const ruleStart = String(rule.start_day || "");
 
-      if (ruleStart >= selectedStart) {
+      if (ruleStart > selectedStart) {
         selected = rule;
+        continue;
+      }
+
+      if (ruleStart === selectedStart) {
+        const selectedCreated = String(selected.created_at || "");
+        const ruleCreated = String(rule.created_at || "");
+
+        if (ruleCreated >= selectedCreated) {
+          selected = rule;
+        }
       }
     }
   }
@@ -347,8 +345,55 @@ function getServiceRuleForDay(dayISO, service, rules = serviceRulesCache) {
     closed: !!selected.closed,
     reason: selected.closed ? (selected.note || "Chiuso da regola") : "",
     source: "rule",
-    rule_id: selected.id
+    rule_id: selected.id,
+    priority: Number(selected.priority || 0)
   };
+}
+
+function serviceLabel(service) {
+  if (service === "lunch") return "Pranzo";
+  if (service === "dinner") return "Cena";
+  return service;
+}
+
+function weekdayLabel(value) {
+  const labels = {
+    0: "Domenica",
+    1: "Lunedì",
+    2: "Martedì",
+    3: "Mercoledì",
+    4: "Giovedì",
+    5: "Venerdì",
+    6: "Sabato"
+  };
+
+  return labels[Number(value)] || "Giorno";
+}
+
+function scopeLabel(scope) {
+  const labels = {
+    all: "Tutti i giorni",
+    custom: "Data precisa",
+    weekday: "Giorno della settimana",
+    holidays: "Festivi",
+    festivi: "Festivi"
+  };
+
+  return labels[String(scope || "custom")] || scope || "Personalizzato";
+}
+
+function serviceRuleHoursText(rule) {
+  if (!rule) return "Orari standard";
+
+  if (rule.closed) {
+    return rule.reason || "Chiuso";
+  }
+
+  const openTime = String(rule.open_time || "").slice(0, 5);
+  const closeTime = String(rule.close_time || "").slice(0, 5);
+  const step = Number(rule.slot_step || 15);
+
+  return `${openTime} - ${closeTime} · ogni ${step} min`;
 }
 
 function detectService(reservation) {
@@ -393,19 +438,6 @@ function groupReservationsByDay(reservations) {
   return map;
 }
 
-function buildCalendarMap(rows) {
-  const map = new Map();
-
-  for (const row of rows) {
-    map.set(row.day, {
-      lunch_closed: !!row.lunch_closed,
-      dinner_closed: !!row.dinner_closed
-    });
-  }
-
-  return map;
-}
-
 function serviceStateClass(covers, max, blocked) {
   if (blocked) return "blocked";
   if (covers >= max) return "full";
@@ -419,273 +451,381 @@ function dayClass(lunchState, dinnerState) {
   return "day-available";
 }
 
-function weekdayLabel(value) {
-  const labels = {
-    0: "Domenica",
-    1: "Lunedì",
-    2: "Martedì",
-    3: "Mercoledì",
-    4: "Giovedì",
-    5: "Venerdì",
-    6: "Sabato"
-  };
+function getReferenceDateForTarget(target) {
+  const today = new Date();
 
-  if (value === null || value === undefined || value === "") return "Non specifico";
+  if (!target) return todayISO();
 
-  return labels[Number(value)] || "Non specifico";
-}
+  if (target.type === "holidays") {
+    for (let i = 0; i < 370; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
 
-function serviceLabel(service) {
-  if (service === "lunch") return "Pranzo";
-  if (service === "dinner") return "Cena";
-  return service;
-}
+      const iso = toISODate(d);
 
-function scopeLabel(scope) {
-  const labels = {
-    all: "Tutti i giorni",
-    custom: "Data / periodo scelto",
-    weekday: "Giorno della settimana",
-    working_days: "Feriali",
-    feriali: "Feriali",
-    holidays: "Festivi e domeniche",
-    festivi: "Festivi e domeniche"
-  };
+      if (isItalianHoliday(iso)) {
+        return iso;
+      }
+    }
 
-  return labels[String(scope || "custom")] || scope || "Personalizzato";
-}
-
-function serviceRuleHoursText(rule) {
-  if (!rule) return "Orari standard";
-
-  if (rule.closed) {
-    return rule.reason || "Chiuso";
+    return todayISO();
   }
 
-  const openTime = String(rule.open_time || "").slice(0, 5);
-  const closeTime = String(rule.close_time || "").slice(0, 5);
-  const step = Number(rule.slot_step || 15);
+  if (target.type === "weekday") {
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
 
-  return `${openTime} - ${closeTime} · ogni ${step} min`;
-}
+      const iso = toISODate(d);
 
-async function fetchMonthData(firstISO, lastISO) {
-  const [reservationsRes, calendarRes, rulesRes, serviceRulesRes] = await Promise.all([
-    supabase
-      .from("reservations")
-      .select("*")
-      .gte("reservation_date", firstISO)
-      .lte("reservation_date", lastISO),
-
-    supabase
-      .from("booking_calendar")
-      .select("day, lunch_closed, dinner_closed")
-      .gte("day", firstISO)
-      .lte("day", lastISO),
-
-    supabase
-      .from("booking_rules")
-      .select("*")
-      .order("start_day", { ascending: true }),
-
-    supabase
-      .from("booking_service_rules")
-      .select("*")
-      .lte("start_day", lastISO)
-      .or(`end_day.is.null,end_day.gte.${firstISO}`)
-      .order("start_day", { ascending: true })
-  ]);
-
-  if (reservationsRes.error) throw reservationsRes.error;
-  if (calendarRes.error) throw calendarRes.error;
-  if (rulesRes.error) throw rulesRes.error;
-
-  if (serviceRulesRes.error) {
-    console.warn("Regole orarie non caricate:", serviceRulesRes.error.message);
+      if (!isItalianHoliday(iso) && d.getDay() === Number(target.weekday)) {
+        return iso;
+      }
+    }
   }
 
-  serviceRulesCache = serviceRulesRes.data || [];
+  return todayISO();
+}
+
+function getServiceTimes(service) {
+  if (service === "dinner") {
+    return {
+      open_time: "18:30",
+      close_time: "23:00"
+    };
+  }
 
   return {
-    reservations: reservationsRes.data || [],
-    calendarRows: calendarRes.data || [],
-    rules: rulesRes.data || [],
-    serviceRules: serviceRulesRes.data || []
+    open_time: "12:30",
+    close_time: "15:00"
   };
 }
 
-function renderMonth(days, reservationsMap, calendarMap, rules, serviceRules) {
-  calendarGrid.innerHTML = days.map(day => {
-    const iso = toISODate(day);
+async function insertServiceRule(payload) {
+  console.log("Regola da salvare:", payload);
 
-    const dayData = reservationsMap.get(iso) || {
-      lunchReservations: 0,
-      dinnerReservations: 0,
-      lunchCovers: 0,
-      dinnerCovers: 0
-    };
+  const { error } = await supabase
+    .from("booking_service_rules")
+    .insert([payload]);
 
-    const blocks = calendarMap.get(iso);
-    const caps = getRuleForDay(iso, rules);
+  if (error) {
+    console.error("Errore booking_service_rules:", error);
+    throw new Error(`${error.message} ${error.code ? "(" + error.code + ")" : ""}`);
+  }
+}
 
-    const lunchRule = getServiceRuleForDay(iso, "lunch", serviceRules);
-    const dinnerRule = getServiceRuleForDay(iso, "dinner", serviceRules);
+async function saveRule({
+  service,
+  closed,
+  scope,
+  weekday = null,
+  start_day = null,
+  end_day = null,
+  priority,
+  note = null
+}) {
+  const times = getServiceTimes(service);
 
-    const lunchBlockedByDay = !!blocks?.lunch_closed;
-    const dinnerBlockedByDay = !!blocks?.dinner_closed;
+  const payload = {
+    start_day: start_day || todayISO(),
+    end_day: end_day || null,
+    weekday,
+    service,
+    open_time: closed ? null : times.open_time,
+    close_time: closed ? null : times.close_time,
+    slot_step: 15,
+    closed,
+    scope,
+    note,
+    priority
+  };
 
-    const lunchBlockedByRule = !!lunchRule.closed;
-    const dinnerBlockedByRule = !!dinnerRule.closed;
+  await insertServiceRule(payload);
+}
 
-    const lunchBlocked = lunchBlockedByDay || lunchBlockedByRule;
-    const dinnerBlocked = dinnerBlockedByDay || dinnerBlockedByRule;
+async function loadServiceRulesList() {
+  if (!serviceRulesList) return;
 
-    const lunchState = serviceStateClass(dayData.lunchCovers, caps.lunch, lunchBlocked);
-    const dinnerState = serviceStateClass(dayData.dinnerCovers, caps.dinner, dinnerBlocked);
+  const today = todayISO();
 
-    const lunchButtonText = lunchBlockedByRule
-      ? "Regola globale"
-      : lunchBlockedByDay
-        ? "Sblocca"
-        : "Blocca";
+  serviceRulesList.innerHTML = `
+    <div class="rule-row">
+      <div class="rule-row-main">
+        <div class="rule-row-title">Caricamento regole...</div>
+        <div class="rule-row-sub">Attendere.</div>
+      </div>
+    </div>
+  `;
 
-    const dinnerButtonText = dinnerBlockedByRule
-      ? "Regola globale"
-      : dinnerBlockedByDay
-        ? "Sblocca"
-        : "Blocca";
+  const { data, error } = await supabase
+    .from("booking_service_rules")
+    .select("*")
+    .or(`end_day.is.null,end_day.gte.${today}`)
+    .order("priority", { ascending: true })
+    .order("start_day", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    serviceRulesList.innerHTML = `
+      <div class="rule-row">
+        <div class="rule-row-main">
+          <div class="rule-row-title">Errore caricamento regole</div>
+          <div class="rule-row-sub">${escapeHtml(error.message)}</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const rows = data || [];
+  serviceRulesCache = rows;
+
+  if (!rows.length) {
+    serviceRulesList.innerHTML = `
+      <div class="rule-row">
+        <div class="rule-row-main">
+          <div class="rule-row-title">Nessuna regola attiva o futura</div>
+          <div class="rule-row-sub">Usa i pulsanti sopra per aprire o chiudere pranzi e cene.</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  serviceRulesList.innerHTML = rows.map(row => {
+    const startDay = row.start_day || "";
+    const endDay = row.end_day || "senza scadenza";
+    const closed = !!row.closed;
+
+    const hours = closed
+      ? "Servizio chiuso"
+      : `${String(row.open_time || "").slice(0, 5)} - ${String(row.close_time || "").slice(0, 5)}`;
+
+    const sub = [
+      `Periodo: ${startDay} → ${endDay}`,
+      `Tipo: ${scopeLabel(row.scope)}`,
+      `Priorità: ${Number(row.priority || 1)}`,
+      row.weekday !== null && row.weekday !== undefined ? `Giorno: ${weekdayLabel(row.weekday)}` : "",
+      row.note ? `Nota: ${row.note}` : ""
+    ].filter(Boolean).join(" · ");
 
     return `
-      <article class="day-card ${dayClass(lunchState, dinnerState)}">
-        <div class="day-top">
-          <div class="day-number">${day.getDate()}</div>
-          <div class="day-date-badge">${iso}</div>
+      <div class="rule-row">
+        <div class="rule-row-main">
+          <div class="rule-row-title">${escapeHtml(serviceLabel(row.service))}</div>
+          <div class="rule-row-sub">${escapeHtml(sub)}</div>
         </div>
 
-        <section class="service-box ${lunchBlocked ? "blocked" : ""}">
-          <h3 class="service-title">Pranzo</h3>
+        <span class="rule-pill ${closed ? "closed" : "open"}">
+          ${closed ? "Chiuso" : "Aperto"}
+        </span>
 
-          <div class="service-hours-pill">
-            🕒 ${escapeHtml(serviceRuleHoursText(lunchRule))}
-          </div>
+        <span class="rule-pill">
+          ${escapeHtml(hours)}
+        </span>
 
-          <div class="service-meta-row">
-            <span class="service-meta-pill">🗓 ${dayData.lunchReservations}</span>
-            <span class="service-meta-pill">👥 ${dayData.lunchCovers}/${caps.lunch}</span>
-          </div>
-
-          <div class="service-actions">
-            <button
-              class="btn ${lunchBlocked ? "btn-danger" : "btn-soft"} btn-toggle-block"
-              data-day="${iso}"
-              data-service="lunch"
-              data-blocked="${lunchBlockedByDay}"
-              ${lunchBlockedByRule ? "disabled" : ""}
-            >
-              ${lunchButtonText}
-            </button>
-
-            <button
-              class="btn btn-soft btn-change-capacity"
-              data-day="${iso}"
-              data-service="lunch"
-              data-current="${caps.lunch}"
-            >
-              Capienza
-            </button>
-          </div>
-        </section>
-
-        <section class="service-box ${dinnerBlocked ? "blocked" : ""}">
-          <h3 class="service-title">Cena</h3>
-
-          <div class="service-hours-pill">
-            🕒 ${escapeHtml(serviceRuleHoursText(dinnerRule))}
-          </div>
-
-          <div class="service-meta-row">
-            <span class="service-meta-pill">🗓 ${dayData.dinnerReservations}</span>
-            <span class="service-meta-pill">👥 ${dayData.dinnerCovers}/${caps.dinner}</span>
-          </div>
-
-          <div class="service-actions">
-            <button
-              class="btn ${dinnerBlocked ? "btn-danger" : "btn-soft"} btn-toggle-block"
-              data-day="${iso}"
-              data-service="dinner"
-              data-blocked="${dinnerBlockedByDay}"
-              ${dinnerBlockedByRule ? "disabled" : ""}
-            >
-              ${dinnerButtonText}
-            </button>
-
-            <button
-              class="btn btn-soft btn-change-capacity"
-              data-day="${iso}"
-              data-service="dinner"
-              data-current="${caps.dinner}"
-            >
-              Capienza
-            </button>
-          </div>
-        </section>
-      </article>
+        <button
+          class="btn btn-danger btn-delete-service-rule"
+          type="button"
+          data-id="${row.id}"
+        >
+          Elimina
+        </button>
+      </div>
     `;
   }).join("");
 
-  bindCalendarActions();
+  document.querySelectorAll(".btn-delete-service-rule").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await deleteServiceRule(btn.dataset.id);
+    });
+  });
 }
 
-async function ensureCalendarRow(dayISO) {
-  const { data, error } = await supabase
-    .from("booking_calendar")
-    .select("day, lunch_closed, dinner_closed")
-    .eq("day", dayISO)
-    .maybeSingle();
+async function deleteServiceRule(id) {
+  if (!id) return;
 
-  if (error) throw error;
-
-  if (data) {
-    return data;
+  if (!confirm("Vuoi eliminare questa regola?")) {
+    return;
   }
 
-  const { error: insertError } = await supabase
-    .from("booking_calendar")
-    .insert([{
-      day: dayISO,
-      lunch_closed: false,
-      dinner_closed: false
-    }]);
-
-  if (insertError) throw insertError;
-}
-
-async function toggleBlock(dayISO, service, blocked) {
   if (busy) return;
 
   busy = true;
 
   try {
-    setStatus("Aggiornamento in corso...");
-
-    await ensureCalendarRow(dayISO);
-
-    const patch = service === "lunch"
-      ? { lunch_closed: !blocked }
-      : { dinner_closed: !blocked };
+    setRulesStatus("Eliminazione regola...");
 
     const { error } = await supabase
-      .from("booking_calendar")
-      .update(patch)
-      .eq("day", dayISO);
+      .from("booking_service_rules")
+      .delete()
+      .eq("id", id);
 
     if (error) throw error;
 
+    setRulesStatus("Regola eliminata ✅", "ok");
+
+    await loadServiceRulesList();
     await loadCalendar(true);
-    setStatus("Servizio aggiornato ✅", "ok");
+    refreshModalButtons();
   } catch (err) {
     console.error(err);
-    setStatus("Errore aggiornamento servizio: " + (err?.message || err), "bad");
+    setRulesStatus("Errore eliminazione regola: " + (err?.message || err), "bad");
+  } finally {
+    busy = false;
+  }
+}
+
+function openDayModal(target) {
+  activeModalTarget = target;
+
+  dayRuleModalTitle.textContent = target.label;
+
+  if (target.type === "holidays") {
+    dayRuleModalSubtitle.textContent = "Gestisci solo i festivi nazionali. Se una data è festiva, vale come Festivi e non come giorno della settimana.";
+  } else {
+    dayRuleModalSubtitle.textContent = `Gestisci ${target.label}. I festivi non vengono inclusi in questo giorno.`;
+  }
+
+  refreshModalButtons();
+
+  dayRuleModal?.classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+function closeDayModal() {
+  activeModalTarget = null;
+  dayRuleModal?.classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+function setToggleButtonState(btn, rule) {
+  if (!btn) return;
+
+  const state = btn.querySelector(".service-toggle-state");
+  const isClosed = !!rule.closed;
+
+  btn.classList.remove("open", "closed");
+  btn.classList.add(isClosed ? "closed" : "open");
+
+  if (state) {
+    state.textContent = isClosed ? "CHIUSO" : "APERTO";
+  }
+}
+
+function refreshModalButtons() {
+  if (!activeModalTarget) return;
+
+  const refDate = getReferenceDateForTarget(activeModalTarget);
+
+  const lunchRule = getServiceRuleForDay(refDate, "lunch", serviceRulesCache);
+  const dinnerRule = getServiceRuleForDay(refDate, "dinner", serviceRulesCache);
+
+  setToggleButtonState(modalLunchToggle, lunchRule);
+  setToggleButtonState(modalDinnerToggle, dinnerRule);
+}
+
+async function toggleModalService(service) {
+  if (!activeModalTarget || busy) return;
+
+  const refDate = getReferenceDateForTarget(activeModalTarget);
+  const currentRule = getServiceRuleForDay(refDate, service, serviceRulesCache);
+  const newClosed = !currentRule.closed;
+
+  busy = true;
+
+  try {
+    setRulesStatus("Salvataggio automatico...");
+
+    if (activeModalTarget.type === "holidays") {
+      await saveRule({
+        service,
+        closed: newClosed,
+        scope: "holidays",
+        weekday: null,
+        priority: 2,
+        note: `${newClosed ? "Chiusura" : "Apertura"} ${serviceLabel(service).toLowerCase()} festivi`
+      });
+    } else {
+      await saveRule({
+        service,
+        closed: newClosed,
+        scope: "weekday",
+        weekday: Number(activeModalTarget.weekday),
+        priority: 2,
+        note: `${newClosed ? "Chiusura" : "Apertura"} ${serviceLabel(service).toLowerCase()} ${activeModalTarget.label}`
+      });
+    }
+
+    await loadServiceRulesList();
+    await loadCalendar(true);
+    refreshModalButtons();
+
+    setRulesStatus("Salvato automaticamente ✅", "ok");
+  } catch (err) {
+    console.error(err);
+    setRulesStatus("Errore salvataggio: " + (err?.message || err), "bad");
+  } finally {
+    busy = false;
+  }
+}
+
+async function saveBulkRule(service, closed) {
+  if (busy) return;
+
+  busy = true;
+
+  try {
+    setRulesStatus("Salvataggio regola generale...");
+
+    await saveRule({
+      service,
+      closed,
+      scope: "all",
+      weekday: null,
+      priority: 1,
+      note: `${closed ? "Chiusura" : "Apertura"} generale ${serviceLabel(service).toLowerCase()}`
+    });
+
+    await loadServiceRulesList();
+    await loadCalendar(true);
+    refreshModalButtons();
+
+    setRulesStatus("Regola generale salvata ✅", "ok");
+  } catch (err) {
+    console.error(err);
+    setRulesStatus("Errore regola generale: " + (err?.message || err), "bad");
+  } finally {
+    busy = false;
+  }
+}
+
+async function saveSpecificDateRule(dayISO, service, closed) {
+  if (busy) return;
+
+  busy = true;
+
+  try {
+    setStatus("Salvataggio singola data...");
+
+    await saveRule({
+      service,
+      closed,
+      scope: "custom",
+      weekday: null,
+      start_day: dayISO,
+      end_day: dayISO,
+      priority: 3,
+      note: `${closed ? "Chiusura" : "Apertura"} ${serviceLabel(service).toLowerCase()} del ${dayISO}`
+    });
+
+    await loadServiceRulesList();
+    await loadCalendar(true);
+
+    setStatus("Singola data aggiornata ✅", "ok");
+  } catch (err) {
+    console.error(err);
+    setStatus("Errore singola data: " + (err?.message || err), "bad");
   } finally {
     busy = false;
   }
@@ -767,7 +907,7 @@ async function changeCapacityFromDay(dayISO, service, currentValue) {
     if (updateFutureError) throw updateFutureError;
 
     await loadCalendar(true);
-    setStatus("Capienza aggiornata per questo giorno e i successivi ✅", "ok");
+    setStatus("Capienza aggiornata ✅", "ok");
   } catch (err) {
     console.error(err);
     setStatus("Errore aggiornamento capienza: " + (err?.message || err), "bad");
@@ -776,15 +916,160 @@ async function changeCapacityFromDay(dayISO, service, currentValue) {
   }
 }
 
-function bindCalendarActions() {
-  document.querySelectorAll(".btn-toggle-block").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      if (btn.disabled) return;
+async function fetchMonthData(firstISO, lastISO) {
+  const [reservationsRes, rulesRes, serviceRulesRes] = await Promise.all([
+    supabase
+      .from("reservations")
+      .select("*")
+      .gte("reservation_date", firstISO)
+      .lte("reservation_date", lastISO),
 
-      await toggleBlock(
+    supabase
+      .from("booking_rules")
+      .select("*")
+      .order("start_day", { ascending: true }),
+
+    supabase
+      .from("booking_service_rules")
+      .select("*")
+      .lte("start_day", lastISO)
+      .or(`end_day.is.null,end_day.gte.${firstISO}`)
+      .order("priority", { ascending: true })
+      .order("start_day", { ascending: true })
+      .order("created_at", { ascending: true })
+  ]);
+
+  if (reservationsRes.error) throw reservationsRes.error;
+  if (rulesRes.error) throw rulesRes.error;
+
+  if (serviceRulesRes.error) {
+    console.warn("Regole orarie non caricate:", serviceRulesRes.error.message);
+  }
+
+  serviceRulesCache = serviceRulesRes.data || [];
+
+  return {
+    reservations: reservationsRes.data || [],
+    rules: rulesRes.data || [],
+    serviceRules: serviceRulesRes.data || []
+  };
+}
+
+function renderMonth(days, reservationsMap, rules, serviceRules) {
+  calendarGrid.innerHTML = days.map(day => {
+    const iso = toISODate(day);
+
+    const dayData = reservationsMap.get(iso) || {
+      lunchReservations: 0,
+      dinnerReservations: 0,
+      lunchCovers: 0,
+      dinnerCovers: 0
+    };
+
+    const caps = getRuleForDay(iso, rules);
+
+    const lunchRule = getServiceRuleForDay(iso, "lunch", serviceRules);
+    const dinnerRule = getServiceRuleForDay(iso, "dinner", serviceRules);
+
+    const lunchBlocked = !!lunchRule.closed;
+    const dinnerBlocked = !!dinnerRule.closed;
+
+    const lunchState = serviceStateClass(dayData.lunchCovers, caps.lunch, lunchBlocked);
+    const dinnerState = serviceStateClass(dayData.dinnerCovers, caps.dinner, dinnerBlocked);
+
+    const isHoliday = isItalianHoliday(iso);
+
+    const lunchButtonText = lunchBlocked ? "Apri" : "Chiudi";
+    const dinnerButtonText = dinnerBlocked ? "Apri" : "Chiudi";
+
+    return `
+      <article class="day-card ${dayClass(lunchState, dinnerState)}">
+        <div class="day-top">
+          <div class="day-number">${day.getDate()}</div>
+          <div class="day-date-badge ${isHoliday ? "holiday" : ""}">
+            ${isHoliday ? "Festivo" : iso}
+          </div>
+        </div>
+
+        <section class="service-box ${lunchBlocked ? "blocked" : ""}">
+          <h3 class="service-title">Pranzo</h3>
+
+          <div class="service-hours-pill">
+            🕒 ${escapeHtml(serviceRuleHoursText(lunchRule))}
+          </div>
+
+          <div class="service-meta-row">
+            <span class="service-meta-pill">🗓 ${dayData.lunchReservations}</span>
+            <span class="service-meta-pill">👥 ${dayData.lunchCovers}/${caps.lunch}</span>
+          </div>
+
+          <div class="service-actions">
+            <button
+              class="btn ${lunchBlocked ? "btn-soft" : "btn-danger"} btn-specific-date"
+              data-day="${iso}"
+              data-service="lunch"
+              data-closed="${!lunchBlocked}"
+            >
+              ${lunchButtonText}
+            </button>
+
+            <button
+              class="btn btn-soft btn-change-capacity"
+              data-day="${iso}"
+              data-service="lunch"
+              data-current="${caps.lunch}"
+            >
+              Capienza
+            </button>
+          </div>
+        </section>
+
+        <section class="service-box ${dinnerBlocked ? "blocked" : ""}">
+          <h3 class="service-title">Cena</h3>
+
+          <div class="service-hours-pill">
+            🕒 ${escapeHtml(serviceRuleHoursText(dinnerRule))}
+          </div>
+
+          <div class="service-meta-row">
+            <span class="service-meta-pill">🗓 ${dayData.dinnerReservations}</span>
+            <span class="service-meta-pill">👥 ${dayData.dinnerCovers}/${caps.dinner}</span>
+          </div>
+
+          <div class="service-actions">
+            <button
+              class="btn ${dinnerBlocked ? "btn-soft" : "btn-danger"} btn-specific-date"
+              data-day="${iso}"
+              data-service="dinner"
+              data-closed="${!dinnerBlocked}"
+            >
+              ${dinnerButtonText}
+            </button>
+
+            <button
+              class="btn btn-soft btn-change-capacity"
+              data-day="${iso}"
+              data-service="dinner"
+              data-current="${caps.dinner}"
+            >
+              Capienza
+            </button>
+          </div>
+        </section>
+      </article>
+    `;
+  }).join("");
+
+  bindCalendarActions();
+}
+
+function bindCalendarActions() {
+  document.querySelectorAll(".btn-specific-date").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await saveSpecificDateRule(
         btn.dataset.day,
         btn.dataset.service,
-        btn.dataset.blocked === "true"
+        btn.dataset.closed === "true"
       );
     });
   });
@@ -816,15 +1101,13 @@ async function loadCalendar(withFlash = false) {
   try {
     const {
       reservations,
-      calendarRows,
       rules,
       serviceRules
     } = await fetchMonthData(firstISO, lastISO);
 
     const reservationsMap = groupReservationsByDay(reservations);
-    const calendarMap = buildCalendarMap(calendarRows);
 
-    renderMonth(days, reservationsMap, calendarMap, rules, serviceRules);
+    renderMonth(days, reservationsMap, rules, serviceRules);
 
     if (withFlash) {
       calendarGrid.style.opacity = "0.65";
@@ -839,552 +1122,63 @@ async function loadCalendar(withFlash = false) {
   }
 }
 
-function getServiceRulePayloadsFromForm() {
-  const startDay = normalizeDateToISO(ruleStartDay.value);
-  const endDay = normalizeDateToISO(ruleEndDay.value);
-  const service = ruleService.value;
-  const closed = ruleClosed.value === "true";
-  const scope = ruleScope.value || "custom";
-  const weekday = ruleWeekday.value === "" ? null : Number(ruleWeekday.value);
-  const openTime = ruleOpenTime.value || null;
-  const closeTime = ruleCloseTime.value || null;
-  const slotStep = Number(ruleSlotStep.value || 15);
-  const priority = Number(rulePriority.value || 10);
-  const note = String(ruleNote.value || "").trim();
+function bindSimpleControls() {
+  document.querySelectorAll(".weekday-pill").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const value = btn.dataset.ruleDay;
 
-  if (!startDay) {
-    throw new Error("Inserisci la data di inizio.");
-  }
+      if (value === "holidays") {
+        openDayModal({
+          type: "holidays",
+          label: "Festivi"
+        });
 
-  if (endDay && endDay < startDay) {
-    throw new Error("La data finale non può essere precedente alla data iniziale.");
-  }
-
-  if (scope === "weekday" && weekday === null) {
-    throw new Error("Se scegli un giorno della settimana, devi indicare quale giorno.");
-  }
-
-  if (!closed) {
-    if (!openTime || !closeTime) {
-      throw new Error("Per un servizio aperto devi inserire apertura e chiusura.");
-    }
-
-    if (toMinutes(closeTime) <= toMinutes(openTime)) {
-      throw new Error("La chiusura deve essere successiva all'apertura.");
-    }
-  }
-
-  const services = service === "both" ? ["lunch", "dinner"] : [service];
-
-  return services.map(s => {
-    let finalOpenTime = openTime;
-    let finalCloseTime = closeTime;
-
-    if (service === "both" && !closed) {
-      if (s === "lunch" && openTime === "18:30" && closeTime === "23:00") {
-        finalOpenTime = "12:30";
-        finalCloseTime = "15:00";
+        return;
       }
 
-      if (s === "dinner" && openTime === "12:30" && closeTime === "15:00") {
-        finalOpenTime = "18:30";
-        finalCloseTime = "23:00";
-      }
-    }
-
-    return {
-      start_day: startDay,
-      end_day: endDay || null,
-      weekday,
-      service: s,
-      open_time: closed ? null : finalOpenTime,
-      close_time: closed ? null : finalCloseTime,
-      slot_step: slotStep,
-      closed,
-      scope,
-      note: note || null,
-      priority
-    };
-  });
-}
-
-async function insertServiceRules(payloads) {
-  console.log("Regole da salvare:", payloads);
-
-  const { error } = await supabase
-    .from("booking_service_rules")
-    .insert(payloads);
-
-  if (error) {
-    console.error("Errore insert booking_service_rules:", error);
-    throw new Error(`${error.message} ${error.code ? "(" + error.code + ")" : ""}`);
-  }
-}
-
-async function saveServiceRuleFromForm(e) {
-  e?.preventDefault();
-
-  if (busy) return;
-
-  busy = true;
-
-  try {
-    setRulesStatus("Salvataggio regola in corso...");
-
-    const payloads = getServiceRulePayloadsFromForm();
-
-    await insertServiceRules(payloads);
-
-    setRulesStatus("Regola salvata ✅", "ok");
-
-    await loadServiceRulesList();
-    await loadCalendar(true);
-  } catch (err) {
-    console.error(err);
-    setRulesStatus("Errore salvataggio regola: " + (err?.message || err), "bad");
-  } finally {
-    busy = false;
-  }
-}
-
-function baseQuickRulePayload({
-  service,
-  closed,
-  scope,
-  weekday = null,
-  open_time = null,
-  close_time = null,
-  slot_step = 15,
-  note = null,
-  priority = 50
-}) {
-  const startDay = normalizeDateToISO(ruleStartDay.value) || todayISO();
-  const endDay = normalizeDateToISO(ruleEndDay.value) || null;
-
-  return {
-    start_day: startDay,
-    end_day: endDay,
-    weekday,
-    service,
-    open_time: closed ? null : open_time,
-    close_time: closed ? null : close_time,
-    slot_step,
-    closed,
-    scope,
-    note,
-    priority
-  };
-}
-
-async function saveQuickRules(payloads, successMessage) {
-  if (busy) return;
-
-  busy = true;
-
-  try {
-    setRulesStatus("Salvataggio regola rapida...");
-
-    await insertServiceRules(payloads);
-
-    setRulesStatus(successMessage || "Regola salvata ✅", "ok");
-
-    await loadServiceRulesList();
-    await loadCalendar(true);
-  } catch (err) {
-    console.error(err);
-    setRulesStatus("Errore regola rapida: " + (err?.message || err), "bad");
-  } finally {
-    busy = false;
-  }
-}
-
-async function handleQuickRule(type) {
-  const step = Number(ruleSlotStep.value || 15);
-
-  if (type === "close-all-lunch") {
-    await saveQuickRules([
-      baseQuickRulePayload({
-        service: "lunch",
-        closed: true,
-        scope: "all",
-        note: "Blocco di tutti i pranzi",
-        priority: 80
-      })
-    ], "Tutti i pranzi bloccati ✅");
-    return;
-  }
-
-  if (type === "close-all-dinner") {
-    await saveQuickRules([
-      baseQuickRulePayload({
-        service: "dinner",
-        closed: true,
-        scope: "all",
-        note: "Blocco di tutte le cene",
-        priority: 80
-      })
-    ], "Tutte le cene bloccate ✅");
-    return;
-  }
-
-  if (type === "close-weekday") {
-    let weekday = ruleWeekday.value;
-
-    if (weekday === "") {
-      weekday = prompt(
-        "Quale giorno vuoi bloccare?\n0 = Domenica\n1 = Lunedì\n2 = Martedì\n3 = Mercoledì\n4 = Giovedì\n5 = Venerdì\n6 = Sabato",
-        "1"
-      );
-    }
-
-    if (weekday === null) return;
-
-    weekday = Number(weekday);
-
-    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) {
-      setRulesStatus("Giorno non valido. Usa un numero da 0 a 6.", "bad");
-      return;
-    }
-
-    await saveQuickRules([
-      baseQuickRulePayload({
-        service: "lunch",
-        closed: true,
-        scope: "weekday",
-        weekday,
-        note: `Blocco pranzo ${weekdayLabel(weekday)}`,
-        priority: 90
-      }),
-      baseQuickRulePayload({
-        service: "dinner",
-        closed: true,
-        scope: "weekday",
-        weekday,
-        note: `Blocco cena ${weekdayLabel(weekday)}`,
-        priority: 90
-      })
-    ], `${weekdayLabel(weekday)} bloccato a pranzo e cena ✅`);
-    return;
-  }
-
-  if (type === "close-holiday-lunch") {
-    await saveQuickRules([
-      baseQuickRulePayload({
-        service: "lunch",
-        closed: true,
-        scope: "holidays",
-        note: "Blocco pranzi festivi",
-        priority: 70
-      })
-    ], "Pranzi festivi bloccati ✅");
-    return;
-  }
-
-  if (type === "close-holiday-dinner") {
-    await saveQuickRules([
-      baseQuickRulePayload({
-        service: "dinner",
-        closed: true,
-        scope: "holidays",
-        note: "Blocco cene festive",
-        priority: 70
-      })
-    ], "Cene festive bloccate ✅");
-    return;
-  }
-
-  if (type === "close-working-lunch") {
-    await saveQuickRules([
-      baseQuickRulePayload({
-        service: "lunch",
-        closed: true,
-        scope: "working_days",
-        note: "Blocco pranzi feriali",
-        priority: 70
-      })
-    ], "Pranzi feriali bloccati ✅");
-    return;
-  }
-
-  if (type === "close-working-dinner") {
-    await saveQuickRules([
-      baseQuickRulePayload({
-        service: "dinner",
-        closed: true,
-        scope: "working_days",
-        note: "Blocco cene feriali",
-        priority: 70
-      })
-    ], "Cene feriali bloccate ✅");
-    return;
-  }
-
-  if (type === "open-standard") {
-    await saveQuickRules([
-      baseQuickRulePayload({
-        service: "lunch",
-        closed: false,
-        scope: "all",
-        open_time: "12:30",
-        close_time: "15:00",
-        slot_step: step,
-        note: "Ripristino orario standard pranzo",
-        priority: 10
-      }),
-      baseQuickRulePayload({
-        service: "dinner",
-        closed: false,
-        scope: "all",
-        open_time: "18:30",
-        close_time: "23:00",
-        slot_step: step,
-        note: "Ripristino orario standard cena",
-        priority: 10
-      })
-    ], "Orari standard ripristinati ✅");
-  }
-}
-
-async function loadServiceRulesList() {
-  if (!serviceRulesList) return;
-
-  const today = todayISO();
-
-  serviceRulesList.innerHTML = `
-    <div class="rule-row">
-      <div class="rule-row-main">
-        <div class="rule-row-title">Caricamento regole...</div>
-        <div class="rule-row-sub">Attendere.</div>
-      </div>
-    </div>
-  `;
-
-  const { data, error } = await supabase
-    .from("booking_service_rules")
-    .select("*")
-    .or(`end_day.is.null,end_day.gte.${today}`)
-    .order("start_day", { ascending: true });
-
-  if (error) {
-    serviceRulesList.innerHTML = `
-      <div class="rule-row">
-        <div class="rule-row-main">
-          <div class="rule-row-title">Errore caricamento regole</div>
-          <div class="rule-row-sub">${escapeHtml(error.message)}</div>
-        </div>
-      </div>
-    `;
-    return;
-  }
-
-  const rows = data || [];
-  serviceRulesCache = rows;
-
-  if (!rows.length) {
-    serviceRulesList.innerHTML = `
-      <div class="rule-row">
-        <div class="rule-row-main">
-          <div class="rule-row-title">Nessuna regola attiva o futura</div>
-          <div class="rule-row-sub">Puoi crearne una dal modulo sopra.</div>
-        </div>
-      </div>
-    `;
-    return;
-  }
-
-  serviceRulesList.innerHTML = rows.map(row => {
-    const startDay = row.start_day || "";
-    const endDay = row.end_day || "senza scadenza";
-    const closed = !!row.closed;
-
-    const hours = closed
-      ? "Servizio bloccato"
-      : `${String(row.open_time || "").slice(0, 5)} - ${String(row.close_time || "").slice(0, 5)} · ogni ${Number(row.slot_step || 15)} min`;
-
-    const sub = [
-      `Periodo: ${startDay} → ${endDay}`,
-      `Applica a: ${scopeLabel(row.scope)}`,
-      `Priorità: ${Number(row.priority || 10)}`,
-      row.weekday !== null && row.weekday !== undefined ? `Giorno: ${weekdayLabel(row.weekday)}` : "",
-      row.note ? `Nota: ${row.note}` : ""
-    ].filter(Boolean).join(" · ");
-
-    return `
-      <div class="rule-row">
-        <div class="rule-row-main">
-          <div class="rule-row-title">${escapeHtml(serviceLabel(row.service))}</div>
-          <div class="rule-row-sub">${escapeHtml(sub)}</div>
-        </div>
-
-        <span class="rule-pill ${closed ? "closed" : "open"}">
-          ${closed ? "Bloccato" : "Aperto"}
-        </span>
-
-        <span class="rule-pill">
-          ${escapeHtml(hours)}
-        </span>
-
-        <button
-          class="btn btn-danger btn-delete-service-rule"
-          type="button"
-          data-id="${row.id}"
-        >
-          Elimina
-        </button>
-      </div>
-    `;
-  }).join("");
-
-  document.querySelectorAll(".btn-delete-service-rule").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      await deleteServiceRule(btn.dataset.id);
+      openDayModal({
+        type: "weekday",
+        weekday: Number(value),
+        label: weekdayLabel(value)
+      });
     });
   });
-}
 
-async function deleteServiceRule(id) {
-  if (!id) return;
-
-  if (!confirm("Vuoi eliminare questa regola?")) {
-    return;
-  }
-
-  if (busy) return;
-
-  busy = true;
-
-  try {
-    setRulesStatus("Eliminazione regola...");
-
-    const { error } = await supabase
-      .from("booking_service_rules")
-      .delete()
-      .eq("id", id);
-
-    if (error) throw error;
-
-    setRulesStatus("Regola eliminata ✅", "ok");
-
-    await loadServiceRulesList();
-    await loadCalendar(true);
-  } catch (err) {
-    console.error(err);
-    setRulesStatus("Errore eliminazione regola: " + (err?.message || err), "bad");
-  } finally {
-    busy = false;
-  }
-}
-
-async function deletePastRules() {
-  if (!confirm("Vuoi eliminare tutte le regole già scadute?")) {
-    return;
-  }
-
-  if (busy) return;
-
-  busy = true;
-
-  try {
-    setRulesStatus("Eliminazione regole passate...");
-
-    const { error } = await supabase
-      .from("booking_service_rules")
-      .delete()
-      .not("end_day", "is", null)
-      .lt("end_day", todayISO());
-
-    if (error) throw error;
-
-    setRulesStatus("Regole passate eliminate ✅", "ok");
-
-    await loadServiceRulesList();
-    await loadCalendar(true);
-  } catch (err) {
-    console.error(err);
-    setRulesStatus("Errore eliminazione regole passate: " + (err?.message || err), "bad");
-  } finally {
-    busy = false;
-  }
-}
-
-function setDefaultRuleFormValues() {
-  const today = todayISO();
-
-  if (ruleStartDay) ruleStartDay.value = today;
-  if (ruleEndDay) ruleEndDay.value = "";
-  if (ruleService) ruleService.value = "both";
-  if (ruleClosed) ruleClosed.value = "false";
-  if (ruleScope) ruleScope.value = "all";
-  if (ruleWeekday) ruleWeekday.value = "";
-  if (ruleOpenTime) ruleOpenTime.value = "12:30";
-  if (ruleCloseTime) ruleCloseTime.value = "15:00";
-  if (ruleSlotStep) ruleSlotStep.value = "15";
-  if (rulePriority) rulePriority.value = "10";
-  if (ruleNote) ruleNote.value = "";
-
-  updateRuleTimeDefaults();
-  updateWeekdayFieldState();
-}
-
-function updateRuleTimeDefaults() {
-  if (!ruleService || !ruleOpenTime || !ruleCloseTime) return;
-
-  if (ruleService.value === "dinner") {
-    if (ruleOpenTime.value === "12:30" && ruleCloseTime.value === "15:00") {
-      ruleOpenTime.value = "18:30";
-      ruleCloseTime.value = "23:00";
-    }
-  }
-
-  if (ruleService.value === "lunch") {
-    if (ruleOpenTime.value === "18:30" && ruleCloseTime.value === "23:00") {
-      ruleOpenTime.value = "12:30";
-      ruleCloseTime.value = "15:00";
-    }
-  }
-}
-
-function updateWeekdayFieldState() {
-  if (!ruleScope || !ruleWeekday) return;
-
-  if (ruleScope.value === "weekday") {
-    ruleWeekday.disabled = false;
-  } else {
-    ruleWeekday.value = "";
-    ruleWeekday.disabled = true;
-  }
-}
-
-function bindRuleFormEvents() {
-  serviceRuleForm?.addEventListener("submit", saveServiceRuleFromForm);
-
-  serviceRuleForm?.addEventListener("reset", () => {
-    setTimeout(() => {
-      setDefaultRuleFormValues();
-      setRulesStatus("");
-    }, 0);
+  document.querySelectorAll(".big-toggle-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await saveBulkRule(
+        btn.dataset.bulkService,
+        btn.dataset.bulkClosed === "true"
+      );
+    });
   });
 
-  ruleService?.addEventListener("change", updateRuleTimeDefaults);
-  ruleScope?.addEventListener("change", updateWeekdayFieldState);
+  modalLunchToggle?.addEventListener("click", async () => {
+    await toggleModalService("lunch");
+  });
+
+  modalDinnerToggle?.addEventListener("click", async () => {
+    await toggleModalService("dinner");
+  });
+
+  dayRuleModalClose?.addEventListener("click", closeDayModal);
+  dayRuleModalBackdrop?.addEventListener("click", closeDayModal);
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeDayModal();
+  });
 
   document.getElementById("reloadServiceRulesBtn")?.addEventListener("click", async () => {
     await loadServiceRulesList();
     await loadCalendar(true);
+    refreshModalButtons();
     setRulesStatus("Regole aggiornate ✅", "ok");
   });
 
   document.getElementById("reloadServiceRulesListBtn")?.addEventListener("click", async () => {
     await loadServiceRulesList();
-    setRulesStatus("Lista regole aggiornata ✅", "ok");
-  });
-
-  document.getElementById("deletePastRulesBtn")?.addEventListener("click", deletePastRules);
-
-  document.querySelectorAll(".quick-rule-btn").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      await handleQuickRule(btn.dataset.quickRule);
-    });
+    refreshModalButtons();
+    setRulesStatus("Lista aggiornata ✅", "ok");
   });
 }
 
@@ -1420,8 +1214,7 @@ document.getElementById("logoutBtn")?.addEventListener("click", doLogout);
 
 await requireAuth();
 
-setDefaultRuleFormValues();
-bindRuleFormEvents();
+bindSimpleControls();
 
 await loadServiceRulesList();
 await loadCalendar();
