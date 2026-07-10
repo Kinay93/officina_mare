@@ -18,10 +18,19 @@ const dayRuleModalSubtitle = document.getElementById("dayRuleModalSubtitle");
 const modalLunchToggle = document.getElementById("modalLunchToggle");
 const modalDinnerToggle = document.getElementById("modalDinnerToggle");
 
+const specificDayModal = document.getElementById("specificDayModal");
+const specificDayModalBackdrop = document.getElementById("specificDayModalBackdrop");
+const specificDayModalClose = document.getElementById("specificDayModalClose");
+const specificDayModalTitle = document.getElementById("specificDayModalTitle");
+const specificDayModalSubtitle = document.getElementById("specificDayModalSubtitle");
+const specificDayContent = document.getElementById("specificDayContent");
+
 let currentMonthDate = new Date();
 let busy = false;
 let serviceRulesCache = [];
 let activeModalTarget = null;
+let currentCalendarContext = null;
+let activeSpecificDayISO = null;
 
 async function requireAuth() {
   const { data, error } = await supabase.auth.getSession();
@@ -201,10 +210,6 @@ function isSunday(dayISO) {
 }
 
 function getDefaultServiceRuleForDay(dayISO, service) {
-  /*
-    Se è festivo nazionale, viene considerato SOLO festivo.
-    Quindi non applica lunedì/domenica come regola automatica.
-  */
   if (!isItalianHoliday(dayISO)) {
     if (isMonday(dayISO)) {
       return {
@@ -260,16 +265,11 @@ function ruleMatchesDay(rule, dayISO, service) {
   const scope = String(rule.scope || "custom").toLowerCase();
   const isHoliday = isItalianHoliday(dayISO);
 
-  /*
-    Se il giorno è festivo, deve rispondere solo alle regole Festivi
-    o alle regole custom su quella data precisa.
-    Non deve rispondere a lunedì/martedì/domenica.
-  */
   if (isHoliday) {
     if (scope === "holidays" || scope === "festivi") return true;
 
     if (scope === "custom") {
-      return rule.start_day === dayISO && (!rule.end_day || rule.end_day === dayISO);
+      return rule.start_day <= dayISO && (!rule.end_day || rule.end_day >= dayISO);
     }
 
     if (scope === "all") return true;
@@ -445,10 +445,22 @@ function serviceStateClass(covers, max, blocked) {
   return "available";
 }
 
-function dayClass(lunchState, dinnerState) {
-  if (lunchState === "full" || dinnerState === "full") return "day-full";
-  if (lunchState === "warning" || dinnerState === "warning") return "day-warning";
-  return "day-available";
+function dayClass(lunchState, dinnerState, lunchBlocked, dinnerBlocked) {
+  if (lunchState === "full" || dinnerState === "full") return "full";
+  if (lunchState === "warning" || dinnerState === "warning") return "warning";
+  if (lunchBlocked || dinnerBlocked) return "partial-closed";
+  return "open";
+}
+
+function formatLongDate(dayISO) {
+  const d = getLocalDateFromISO(dayISO);
+
+  return d.toLocaleDateString("it-IT", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric"
+  });
 }
 
 function getReferenceDateForTarget(target) {
@@ -668,6 +680,10 @@ async function deleteServiceRule(id) {
     await loadServiceRulesList();
     await loadCalendar(true);
     refreshModalButtons();
+
+    if (activeSpecificDayISO) {
+      renderSpecificDayModal(activeSpecificDayISO);
+    }
   } catch (err) {
     console.error(err);
     setRulesStatus("Errore eliminazione regola: " + (err?.message || err), "bad");
@@ -822,6 +838,10 @@ async function saveSpecificDateRule(dayISO, service, closed) {
     await loadServiceRulesList();
     await loadCalendar(true);
 
+    if (activeSpecificDayISO) {
+      renderSpecificDayModal(activeSpecificDayISO);
+    }
+
     setStatus("Singola data aggiornata ✅", "ok");
   } catch (err) {
     console.error(err);
@@ -907,6 +927,11 @@ async function changeCapacityFromDay(dayISO, service, currentValue) {
     if (updateFutureError) throw updateFutureError;
 
     await loadCalendar(true);
+
+    if (activeSpecificDayISO) {
+      renderSpecificDayModal(activeSpecificDayISO);
+    }
+
     setStatus("Capienza aggiornata ✅", "ok");
   } catch (err) {
     console.error(err);
@@ -955,21 +980,56 @@ async function fetchMonthData(firstISO, lastISO) {
   };
 }
 
+function getDayDetails(dayISO) {
+  const ctx = currentCalendarContext;
+
+  if (!ctx) return null;
+
+  const dayData = ctx.reservationsMap.get(dayISO) || {
+    lunchReservations: 0,
+    dinnerReservations: 0,
+    lunchCovers: 0,
+    dinnerCovers: 0
+  };
+
+  const caps = getRuleForDay(dayISO, ctx.rules);
+
+  const lunchRule = getServiceRuleForDay(dayISO, "lunch", ctx.serviceRules);
+  const dinnerRule = getServiceRuleForDay(dayISO, "dinner", ctx.serviceRules);
+
+  return {
+    dayData,
+    caps,
+    lunchRule,
+    dinnerRule,
+    isHoliday: isItalianHoliday(dayISO)
+  };
+}
+
 function renderMonth(days, reservationsMap, rules, serviceRules) {
-  calendarGrid.innerHTML = days.map(day => {
+  currentCalendarContext = {
+    reservationsMap,
+    rules,
+    serviceRules
+  };
+
+  const firstDay = days[0];
+  const firstWeekday = firstDay.getDay() === 0 ? 7 : firstDay.getDay();
+  const emptyBefore = firstWeekday - 1;
+
+  const cells = [];
+
+  for (let i = 0; i < emptyBefore; i++) {
+    cells.push(`<div class="month-day empty"></div>`);
+  }
+
+  for (const day of days) {
     const iso = toISODate(day);
+    const details = getDayDetails(iso);
 
-    const dayData = reservationsMap.get(iso) || {
-      lunchReservations: 0,
-      dinnerReservations: 0,
-      lunchCovers: 0,
-      dinnerCovers: 0
-    };
+    if (!details) continue;
 
-    const caps = getRuleForDay(iso, rules);
-
-    const lunchRule = getServiceRuleForDay(iso, "lunch", serviceRules);
-    const dinnerRule = getServiceRuleForDay(iso, "dinner", serviceRules);
+    const { dayData, caps, lunchRule, dinnerRule, isHoliday } = details;
 
     const lunchBlocked = !!lunchRule.closed;
     const dinnerBlocked = !!dinnerRule.closed;
@@ -977,94 +1037,153 @@ function renderMonth(days, reservationsMap, rules, serviceRules) {
     const lunchState = serviceStateClass(dayData.lunchCovers, caps.lunch, lunchBlocked);
     const dinnerState = serviceStateClass(dayData.dinnerCovers, caps.dinner, dinnerBlocked);
 
-    const isHoliday = isItalianHoliday(iso);
+    const mainClass = dayClass(lunchState, dinnerState, lunchBlocked, dinnerBlocked);
+    const isPast = iso < todayISO();
 
-    const lunchButtonText = lunchBlocked ? "Apri" : "Chiudi";
-    const dinnerButtonText = dinnerBlocked ? "Apri" : "Chiudi";
-
-    return `
-      <article class="day-card ${dayClass(lunchState, dinnerState)}">
-        <div class="day-top">
-          <div class="day-number">${day.getDate()}</div>
-          <div class="day-date-badge ${isHoliday ? "holiday" : ""}">
-            ${isHoliday ? "Festivo" : iso}
-          </div>
+    cells.push(`
+      <button
+        type="button"
+        class="month-day ${mainClass} ${isPast ? "past" : ""} ${isHoliday ? "holiday" : ""}"
+        data-day="${iso}"
+      >
+        <div class="month-day-number">
+          <span>${day.getDate()}</span>
+          ${isHoliday ? `<span class="month-day-badge">Festivo</span>` : ""}
         </div>
 
-        <section class="service-box ${lunchBlocked ? "blocked" : ""}">
-          <h3 class="service-title">Pranzo</h3>
-
-          <div class="service-hours-pill">
-            🕒 ${escapeHtml(serviceRuleHoursText(lunchRule))}
+        <div class="month-day-info">
+          <div class="month-day-line ${lunchBlocked ? "closed" : ""}">
+            <span>P</span>
+            <span>${lunchBlocked ? "chiuso" : `${dayData.lunchCovers}/${caps.lunch}`}</span>
           </div>
 
-          <div class="service-meta-row">
-            <span class="service-meta-pill">🗓 ${dayData.lunchReservations}</span>
-            <span class="service-meta-pill">👥 ${dayData.lunchCovers}/${caps.lunch}</span>
+          <div class="month-day-line ${dinnerBlocked ? "closed" : ""}">
+            <span>C</span>
+            <span>${dinnerBlocked ? "chiusa" : `${dayData.dinnerCovers}/${caps.dinner}`}</span>
           </div>
+        </div>
+      </button>
+    `);
+  }
 
-          <div class="service-actions">
-            <button
-              class="btn ${lunchBlocked ? "btn-soft" : "btn-danger"} btn-specific-date"
-              data-day="${iso}"
-              data-service="lunch"
-              data-closed="${!lunchBlocked}"
-            >
-              ${lunchButtonText}
-            </button>
+  calendarGrid.innerHTML = cells.join("");
 
-            <button
-              class="btn btn-soft btn-change-capacity"
-              data-day="${iso}"
-              data-service="lunch"
-              data-current="${caps.lunch}"
-            >
-              Capienza
-            </button>
-          </div>
-        </section>
-
-        <section class="service-box ${dinnerBlocked ? "blocked" : ""}">
-          <h3 class="service-title">Cena</h3>
-
-          <div class="service-hours-pill">
-            🕒 ${escapeHtml(serviceRuleHoursText(dinnerRule))}
-          </div>
-
-          <div class="service-meta-row">
-            <span class="service-meta-pill">🗓 ${dayData.dinnerReservations}</span>
-            <span class="service-meta-pill">👥 ${dayData.dinnerCovers}/${caps.dinner}</span>
-          </div>
-
-          <div class="service-actions">
-            <button
-              class="btn ${dinnerBlocked ? "btn-soft" : "btn-danger"} btn-specific-date"
-              data-day="${iso}"
-              data-service="dinner"
-              data-closed="${!dinnerBlocked}"
-            >
-              ${dinnerButtonText}
-            </button>
-
-            <button
-              class="btn btn-soft btn-change-capacity"
-              data-day="${iso}"
-              data-service="dinner"
-              data-current="${caps.dinner}"
-            >
-              Capienza
-            </button>
-          </div>
-        </section>
-      </article>
-    `;
-  }).join("");
-
-  bindCalendarActions();
+  bindMonthDayActions();
 }
 
-function bindCalendarActions() {
-  document.querySelectorAll(".btn-specific-date").forEach(btn => {
+function bindMonthDayActions() {
+  document.querySelectorAll(".month-day[data-day]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      openSpecificDayModal(btn.dataset.day);
+    });
+  });
+}
+
+function specificServiceCard(dayISO, service, rule, covers, reservations, max) {
+  const closed = !!rule.closed;
+  const nextClosed = !closed;
+
+  return `
+    <section class="specific-service-card ${closed ? "closed" : ""}">
+      <div class="specific-service-head">
+        <h3>${escapeHtml(serviceLabel(service))}</h3>
+        <span class="specific-state-pill ${closed ? "closed" : ""}">
+          ${closed ? "CHIUSO" : "APERTO"}
+        </span>
+      </div>
+
+      <div class="specific-meta">
+        <div class="specific-meta-item">
+          🕒 ${escapeHtml(serviceRuleHoursText(rule))}
+        </div>
+
+        <div class="specific-meta-item">
+          🗓 Prenotazioni: ${reservations}
+        </div>
+
+        <div class="specific-meta-item">
+          👥 Coperti: ${covers}/${max}
+        </div>
+
+        <div class="specific-meta-item">
+          ⭐ Priorità: ${Number(rule.priority || 0)}
+        </div>
+      </div>
+
+      <div class="specific-actions">
+        <button
+          type="button"
+          class="btn ${closed ? "btn-soft" : "btn-danger"} btn-specific-modal-date"
+          data-day="${escapeHtml(dayISO)}"
+          data-service="${escapeHtml(service)}"
+          data-closed="${nextClosed}"
+        >
+          ${closed ? "Apri" : "Chiudi"}
+        </button>
+
+        <button
+          type="button"
+          class="btn btn-soft btn-specific-modal-capacity"
+          data-day="${escapeHtml(dayISO)}"
+          data-service="${escapeHtml(service)}"
+          data-current="${max}"
+        >
+          Capienza
+        </button>
+      </div>
+    </section>
+  `;
+}
+
+function openSpecificDayModal(dayISO) {
+  activeSpecificDayISO = dayISO;
+
+  renderSpecificDayModal(dayISO);
+
+  specificDayModal?.classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+function closeSpecificDayModal() {
+  activeSpecificDayISO = null;
+  specificDayModal?.classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+function renderSpecificDayModal(dayISO) {
+  const details = getDayDetails(dayISO);
+
+  if (!details || !specificDayContent) return;
+
+  const { dayData, caps, lunchRule, dinnerRule, isHoliday } = details;
+
+  specificDayModalTitle.textContent = formatLongDate(dayISO);
+
+  specificDayModalSubtitle.textContent = isHoliday
+    ? "Questo giorno è festivo: valgono le regole Festivi, non quelle del giorno della settimana."
+    : "Dettaglio del giorno selezionato. Le modifiche qui hanno priorità massima.";
+
+  specificDayContent.innerHTML = `
+    ${specificServiceCard(
+      dayISO,
+      "lunch",
+      lunchRule,
+      dayData.lunchCovers,
+      dayData.lunchReservations,
+      caps.lunch
+    )}
+
+    ${specificServiceCard(
+      dayISO,
+      "dinner",
+      dinnerRule,
+      dayData.dinnerCovers,
+      dayData.dinnerReservations,
+      caps.dinner
+    )}
+  `;
+
+  document.querySelectorAll(".btn-specific-modal-date").forEach(btn => {
     btn.addEventListener("click", async () => {
       await saveSpecificDateRule(
         btn.dataset.day,
@@ -1074,7 +1193,7 @@ function bindCalendarActions() {
     });
   });
 
-  document.querySelectorAll(".btn-change-capacity").forEach(btn => {
+  document.querySelectorAll(".btn-specific-modal-capacity").forEach(btn => {
     btn.addEventListener("click", async () => {
       await changeCapacityFromDay(
         btn.dataset.day,
@@ -1164,20 +1283,36 @@ function bindSimpleControls() {
   dayRuleModalClose?.addEventListener("click", closeDayModal);
   dayRuleModalBackdrop?.addEventListener("click", closeDayModal);
 
+  specificDayModalClose?.addEventListener("click", closeSpecificDayModal);
+  specificDayModalBackdrop?.addEventListener("click", closeSpecificDayModal);
+
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeDayModal();
+    if (e.key === "Escape") {
+      closeDayModal();
+      closeSpecificDayModal();
+    }
   });
 
   document.getElementById("reloadServiceRulesBtn")?.addEventListener("click", async () => {
     await loadServiceRulesList();
     await loadCalendar(true);
     refreshModalButtons();
+
+    if (activeSpecificDayISO) {
+      renderSpecificDayModal(activeSpecificDayISO);
+    }
+
     setRulesStatus("Regole aggiornate ✅", "ok");
   });
 
   document.getElementById("reloadServiceRulesListBtn")?.addEventListener("click", async () => {
     await loadServiceRulesList();
     refreshModalButtons();
+
+    if (activeSpecificDayISO) {
+      renderSpecificDayModal(activeSpecificDayISO);
+    }
+
     setRulesStatus("Lista aggiornata ✅", "ok");
   });
 }
