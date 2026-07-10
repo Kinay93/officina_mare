@@ -160,8 +160,13 @@
       font-weight:800;
     }
 
-    .rules-status.ok{ color:#138a5a; }
-    .rules-status.bad{ color:#bf3d3d; }
+    .rules-status.ok{
+      color:#138a5a;
+    }
+
+    .rules-status.bad{
+      color:#bf3d3d;
+    }
 
     .rules-list-wrap{
       margin-top:22px;
@@ -462,11 +467,18 @@
       display:grid;
       grid-template-columns:repeat(7, 1fr);
       gap:8px;
-      margin-bottom:8px;
+      margin-bottom:10px;
       color:var(--muted);
       font-weight:900;
       text-align:center;
-      font-size:13px;
+      font-size:14px;
+    }
+
+    .month-weekdays div{
+      padding:8px 0;
+      border-radius:999px;
+      background:#F7FAFD;
+      border:1px solid var(--border);
     }
 
     .calendar-grid{
@@ -476,16 +488,16 @@
     }
 
     .month-day{
-      min-height:104px;
+      min-height:92px;
       border:1px solid var(--border);
       border-radius:18px;
       background:#fff;
-      padding:10px;
+      padding:12px;
       cursor:pointer;
       transition:.15s ease;
       display:flex;
-      flex-direction:column;
-      justify-content:space-between;
+      align-items:flex-start;
+      justify-content:flex-start;
       position:relative;
     }
 
@@ -534,46 +546,16 @@
     }
 
     .month-day-number{
-      font-size:20px;
+      font-size:24px;
       font-weight:900;
       color:var(--text);
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:8px;
+      line-height:1;
     }
 
-    .month-day-badge{
-      font-size:10px;
-      font-weight:900;
-      padding:4px 7px;
-      border-radius:999px;
-      background:#FFF0C2;
-      color:#9A6500;
-    }
-
-    .month-day-info{
-      display:grid;
-      gap:4px;
-      margin-top:8px;
-      font-size:12px;
-      color:var(--muted);
-      font-weight:800;
-    }
-
+    .month-day-badge,
+    .month-day-info,
     .month-day-line{
-      display:flex;
-      justify-content:space-between;
-      gap:8px;
-      align-items:center;
-      border-radius:10px;
-      padding:4px 6px;
-      background:#F7FAFD;
-    }
-
-    .month-day-line.closed{
-      background:#FFE9E9;
-      color:#B83939;
+      display:none;
     }
 
     .specific-service-card{
@@ -688,31 +670,22 @@
         font-size:11px;
       }
 
+      .month-weekdays div{
+        padding:6px 0;
+      }
+
       .calendar-grid{
         gap:4px;
       }
 
       .month-day{
-        min-height:78px;
-        padding:7px;
-        border-radius:13px;
+        min-height:54px;
+        padding:8px;
+        border-radius:12px;
       }
 
       .month-day-number{
-        font-size:16px;
-      }
-
-      .month-day-badge{
-        display:none;
-      }
-
-      .month-day-info{
-        font-size:10px;
-        gap:3px;
-      }
-
-      .month-day-line{
-        padding:3px 4px;
+        font-size:17px;
       }
 
       .specific-meta,
