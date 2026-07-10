@@ -460,45 +460,55 @@
       border:1px solid var(--border);
       border-radius:24px;
       box-shadow:0 12px 34px rgba(16,40,74,.08);
-      padding:20px;
+      padding:16px;
+      width:100%;
+      max-width:100%;
+      overflow:hidden;
     }
 
     .month-weekdays{
       display:grid;
-      grid-template-columns:repeat(7, 1fr);
-      gap:8px;
-      margin-bottom:10px;
+      grid-template-columns:repeat(7, minmax(0, 1fr));
+      gap:6px;
+      margin-bottom:6px;
       color:var(--muted);
       font-weight:900;
       text-align:center;
-      font-size:14px;
+      font-size:13px;
     }
 
     .month-weekdays div{
-      padding:8px 0;
+      padding:7px 0;
       border-radius:999px;
       background:#F7FAFD;
       border:1px solid var(--border);
+      overflow:hidden;
+      white-space:nowrap;
     }
 
     .calendar-grid{
       display:grid;
-      grid-template-columns:repeat(7, 1fr);
-      gap:8px;
+      grid-template-columns:repeat(7, minmax(0, 1fr));
+      gap:6px;
+      width:100%;
+      max-width:100%;
     }
 
     .month-day{
-      min-height:92px;
+      aspect-ratio:1 / 1;
+      min-height:0 !important;
+      width:100%;
       border:1px solid var(--border);
-      border-radius:18px;
+      border-radius:16px;
       background:#fff;
-      padding:12px;
+      padding:8px;
       cursor:pointer;
       transition:.15s ease;
       display:flex;
       align-items:flex-start;
       justify-content:flex-start;
       position:relative;
+      overflow:hidden;
     }
 
     .month-day:hover{
@@ -524,20 +534,20 @@
     }
 
     .month-day.open{
-      border-left:6px solid #2EAE6B;
+      border-left:5px solid #2EAE6B;
     }
 
     .month-day.partial-closed{
-      border-left:6px solid #C84A4A;
+      border-left:5px solid #C84A4A;
       background:#FFF8F8;
     }
 
     .month-day.warning{
-      border-left:6px solid #D0A12B;
+      border-left:5px solid #D0A12B;
     }
 
     .month-day.full{
-      border-left:6px solid #C84A4A;
+      border-left:5px solid #C84A4A;
     }
 
     .month-day.holiday{
@@ -546,7 +556,7 @@
     }
 
     .month-day-number{
-      font-size:24px;
+      font-size:22px;
       font-weight:900;
       color:var(--text);
       line-height:1;
@@ -555,7 +565,7 @@
     .month-day-badge,
     .month-day-info,
     .month-day-line{
-      display:none;
+      display:none !important;
     }
 
     .specific-service-card{
@@ -641,10 +651,39 @@
       }
     }
 
+    @media (max-width:900px){
+      .month-calendar-card{
+        padding:12px;
+        border-radius:20px;
+      }
+
+      .month-weekdays{
+        gap:5px;
+        font-size:12px;
+      }
+
+      .month-weekdays div{
+        padding:6px 0;
+      }
+
+      .calendar-grid{
+        gap:5px;
+      }
+
+      .month-day{
+        border-radius:13px;
+        padding:7px;
+      }
+
+      .month-day-number{
+        font-size:18px;
+      }
+    }
+
     @media (max-width:768px){
       .calendar-simple-card,
       .month-calendar-card{
-        padding:18px;
+        padding:14px;
       }
 
       .weekday-pills{
@@ -665,32 +704,88 @@
         font-size:28px;
       }
 
-      .month-weekdays{
-        gap:4px;
-        font-size:11px;
-      }
-
-      .month-weekdays div{
-        padding:6px 0;
-      }
-
-      .calendar-grid{
-        gap:4px;
-      }
-
-      .month-day{
-        min-height:54px;
-        padding:8px;
-        border-radius:12px;
-      }
-
-      .month-day-number{
-        font-size:17px;
-      }
-
       .specific-meta,
       .specific-actions{
         grid-template-columns:1fr;
+      }
+    }
+
+    @media (max-width:600px){
+      .admin-content{
+        padding-left:10px;
+        padding-right:10px;
+      }
+
+      .month-calendar-card{
+        padding:8px;
+        border-radius:18px;
+        margin-left:-2px;
+        margin-right:-2px;
+      }
+
+      .month-weekdays{
+        gap:3px;
+        font-size:10px;
+        margin-bottom:4px;
+      }
+
+      .month-weekdays div{
+        padding:5px 0;
+        border-radius:8px;
+      }
+
+      .calendar-grid{
+        gap:3px;
+      }
+
+      .month-day{
+        border-radius:9px;
+        padding:5px;
+        border-width:1px;
+      }
+
+      .month-day.open,
+      .month-day.partial-closed,
+      .month-day.warning,
+      .month-day.full{
+        border-left-width:3px;
+      }
+
+      .month-day.holiday{
+        box-shadow:inset 0 0 0 1.5px #F0C36A;
+      }
+
+      .month-day-number{
+        font-size:14px;
+      }
+    }
+
+    @media (max-width:380px){
+      .admin-content{
+        padding-left:6px;
+        padding-right:6px;
+      }
+
+      .month-calendar-card{
+        padding:6px;
+      }
+
+      .month-weekdays{
+        gap:2px;
+        font-size:9px;
+      }
+
+      .calendar-grid{
+        gap:2px;
+      }
+
+      .month-day{
+        border-radius:7px;
+        padding:4px;
+      }
+
+      .month-day-number{
+        font-size:12px;
       }
     }
   </style>
