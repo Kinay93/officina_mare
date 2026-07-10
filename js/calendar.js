@@ -87,12 +87,6 @@ function toISODate(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function addDaysISO(days) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return toISODate(d);
-}
-
 function getLocalDateFromISO(dayISO) {
   return new Date(dayISO + "T00:00:00");
 }
@@ -1044,24 +1038,10 @@ function renderMonth(days, reservationsMap, rules, serviceRules) {
       <button
         type="button"
         class="month-day ${mainClass} ${isPast ? "past" : ""} ${isHoliday ? "holiday" : ""}"
-        data-day="${iso}"
+        data-day="${escapeHtml(iso)}"
+        title="${isHoliday ? "Festivo - " : ""}${escapeHtml(iso)}"
       >
-        <div class="month-day-number">
-          <span>${day.getDate()}</span>
-          ${isHoliday ? `<span class="month-day-badge">Festivo</span>` : ""}
-        </div>
-
-        <div class="month-day-info">
-          <div class="month-day-line ${lunchBlocked ? "closed" : ""}">
-            <span>P</span>
-            <span>${lunchBlocked ? "chiuso" : `${dayData.lunchCovers}/${caps.lunch}`}</span>
-          </div>
-
-          <div class="month-day-line ${dinnerBlocked ? "closed" : ""}">
-            <span>C</span>
-            <span>${dinnerBlocked ? "chiusa" : `${dayData.dinnerCovers}/${caps.dinner}`}</span>
-          </div>
-        </div>
+        <div class="month-day-number">${day.getDate()}</div>
       </button>
     `);
   }
