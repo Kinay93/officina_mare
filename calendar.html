@@ -10,86 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
   <style>
-    .calendar-toolbar{
-      display:flex;
-      justify-content:space-between;
-      align-items:flex-start;
-      gap:12px;
-      flex-wrap:wrap;
-      margin-bottom:14px;
-    }
-
-    .calendar-toolbar-left,
-    .calendar-toolbar-right{
-      display:flex;
-      gap:12px;
-      align-items:center;
-      flex-wrap:wrap;
-    }
-
-    .calendar-toolbar-left{
-      flex-direction:column;
-      align-items:flex-start;
-      gap:10px;
-    }
-
-    .calendar-title{
-      font-size:36px;
-      font-weight:900;
-      color:var(--text);
-      margin:0;
-      line-height:1;
-      text-transform:capitalize;
-    }
-
-    .calendar-helper{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-
-    .helper-pill{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:8px 12px;
-      border-radius:999px;
-      border:1px solid var(--border);
-      background:#fff;
-      color:#53657F;
-      font-size:12px;
-      font-weight:800;
-      box-shadow:0 8px 20px rgba(16,40,74,.04);
-    }
-
-    .calendar-legend{
-      display:flex;
-      gap:16px;
-      flex-wrap:wrap;
-      margin:10px 0 16px;
-      color:var(--muted);
-      font-weight:700;
-    }
-
-    .legend-item{
-      display:flex;
-      align-items:center;
-      gap:8px;
-    }
-
-    .legend-dot{
-      width:14px;
-      height:14px;
-      border-radius:999px;
-      display:inline-block;
-    }
-
-    .dot-green{ background:#2EAE6B; }
-    .dot-yellow{ background:#D0A12B; }
-    .dot-red{ background:#C84A4A; }
-    .dot-gray{ background:#7C8798; }
-
-    .rules-card{
+    .calendar-simple-card{
       background:#fff;
       border:1px solid var(--border);
       border-radius:24px;
@@ -98,7 +19,7 @@
       margin-bottom:22px;
     }
 
-    .rules-card-head{
+    .calendar-simple-head{
       display:flex;
       justify-content:space-between;
       align-items:flex-start;
@@ -107,52 +28,130 @@
       margin-bottom:18px;
     }
 
-    .rules-card-head h2{
+    .calendar-simple-head h2{
       margin:0;
-      font-size:24px;
+      font-size:26px;
       color:var(--text);
     }
 
-    .rules-card-head p{
+    .calendar-simple-head p{
       margin:8px 0 0;
       color:var(--muted);
       line-height:1.5;
+      max-width:780px;
     }
 
-    .rules-grid{
+    .restaurant-helper{
       display:grid;
-      grid-template-columns:repeat(4, minmax(0, 1fr));
-      gap:14px;
-      margin-bottom:14px;
+      gap:10px;
+      padding:14px 16px;
+      border-radius:18px;
+      background:#F7FAFD;
+      border:1px solid var(--border);
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.5;
+      margin-bottom:18px;
     }
 
-    .rules-grid-3{
-      display:grid;
-      grid-template-columns:repeat(3, minmax(0, 1fr));
-      gap:14px;
-      margin-bottom:14px;
-    }
-
-    .rules-field label{
-      display:block;
-      margin-bottom:7px;
+    .restaurant-helper strong{
       color:var(--text);
-      font-weight:900;
-      font-size:13px;
     }
 
-    .rules-field input,
-    .rules-field select,
-    .rules-field textarea{
-      width:100%;
-    }
-
-    .rules-actions{
+    .weekday-pills{
       display:flex;
       gap:12px;
-      align-items:center;
       flex-wrap:wrap;
+      margin-bottom:22px;
+    }
+
+    .weekday-pill{
+      border:1px solid var(--border);
+      background:#fff;
+      color:var(--text);
+      border-radius:999px;
+      min-height:54px;
+      padding:0 22px;
+      font-size:16px;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow:0 8px 22px rgba(16,40,74,.06);
+      transition:.16s ease;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+    }
+
+    .weekday-pill:hover{
+      transform:translateY(-2px);
+      box-shadow:0 14px 30px rgba(16,40,74,.10);
+      background:#F8FBFF;
+    }
+
+    .weekday-pill.holiday{
+      border-color:#F0C36A;
+      background:#FFF8E8;
+    }
+
+    .bulk-controls{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+      margin-bottom:22px;
+    }
+
+    .bulk-box{
+      border:1px solid var(--border);
+      border-radius:20px;
+      background:#FAFCFF;
+      padding:16px;
+    }
+
+    .bulk-box h3{
+      margin:0 0 12px;
+      font-size:18px;
+      color:var(--text);
+    }
+
+    .bulk-actions{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    .big-toggle-btn{
+      min-height:48px;
+      border-radius:16px;
+      border:1px solid var(--border);
+      font-weight:900;
+      cursor:pointer;
+      font-size:15px;
+      transition:.15s ease;
+    }
+
+    .big-toggle-btn.open{
+      background:#DFF5E8;
+      color:#127A54;
+      border-color:#B8E7CA;
+    }
+
+    .big-toggle-btn.closed{
+      background:#FFE9E9;
+      color:#B83939;
+      border-color:#F0B8B8;
+    }
+
+    .big-toggle-btn:hover{
+      transform:translateY(-1px);
+      box-shadow:0 8px 20px rgba(16,40,74,.08);
+    }
+
+    .priority-note{
       margin-top:12px;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.5;
     }
 
     .rules-status{
@@ -164,43 +163,127 @@
     .rules-status.ok{ color:#138a5a; }
     .rules-status.bad{ color:#bf3d3d; }
 
-    .quick-rules{
-      display:grid;
-      grid-template-columns:repeat(4, minmax(0, 1fr));
-      gap:12px;
-      margin-top:18px;
+    .day-modal{
+      position:fixed;
+      inset:0;
+      z-index:9999;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
     }
 
-    .quick-rule-btn{
-      min-height:54px;
-      border-radius:18px;
-      border:1px solid var(--border);
-      background:#F9FBFE;
+    .day-modal.open{
+      display:flex;
+    }
+
+    .day-modal-backdrop{
+      position:absolute;
+      inset:0;
+      background:rgba(7,20,38,.62);
+      backdrop-filter:blur(4px);
+    }
+
+    .day-modal-card{
+      position:relative;
+      z-index:2;
+      width:min(480px, 94vw);
+      border-radius:28px;
+      background:#fff;
+      box-shadow:0 24px 80px rgba(0,0,0,.28);
+      border:1px solid rgba(255,255,255,.45);
+      padding:24px;
+    }
+
+    .day-modal-close{
+      position:absolute;
+      top:14px;
+      right:14px;
+      width:42px;
+      height:42px;
+      border:0;
+      border-radius:999px;
+      background:#F4F7FB;
       color:var(--text);
+      font-size:28px;
+      line-height:1;
       font-weight:900;
       cursor:pointer;
-      padding:12px;
-      text-align:left;
-      transition:.15s ease;
     }
 
-    .quick-rule-btn:hover{
-      transform:translateY(-1px);
-      box-shadow:0 8px 18px rgba(16,40,74,.08);
-      background:#fff;
+    .day-modal-title{
+      margin:0;
+      font-size:28px;
+      color:var(--text);
+      padding-right:48px;
     }
 
-    .quick-rule-btn span{
-      display:block;
+    .day-modal-subtitle{
+      margin:8px 0 22px;
       color:var(--muted);
-      font-weight:700;
-      font-size:12px;
-      margin-top:4px;
-      line-height:1.35;
+      line-height:1.5;
+    }
+
+    .service-toggle-list{
+      display:grid;
+      gap:14px;
+    }
+
+    .service-toggle-btn{
+      width:100%;
+      min-height:74px;
+      border-radius:22px;
+      border:1px solid var(--border);
+      padding:14px 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      cursor:pointer;
+      transition:.15s ease;
+      font-family:inherit;
+    }
+
+    .service-toggle-btn.open{
+      background:#DFF5E8;
+      border-color:#B8E7CA;
+      color:#127A54;
+    }
+
+    .service-toggle-btn.closed{
+      background:#FFE9E9;
+      border-color:#F0B8B8;
+      color:#B83939;
+    }
+
+    .service-toggle-btn:hover{
+      transform:translateY(-1px);
+      box-shadow:0 10px 24px rgba(16,40,74,.08);
+    }
+
+    .service-toggle-name{
+      font-size:20px;
+      font-weight:900;
+    }
+
+    .service-toggle-state{
+      font-size:14px;
+      font-weight:900;
+      text-transform:uppercase;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(255,255,255,.7);
+    }
+
+    .modal-small-note{
+      margin-top:18px;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.5;
     }
 
     .rules-list-wrap{
-      margin-top:20px;
+      margin-top:22px;
       border-top:1px solid var(--border);
       padding-top:18px;
     }
@@ -216,7 +299,7 @@
 
     .rules-list-head h3{
       margin:0;
-      font-size:18px;
+      font-size:20px;
       color:var(--text);
     }
 
@@ -278,6 +361,85 @@
       color:#127A54;
     }
 
+    .calendar-toolbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:14px;
+    }
+
+    .calendar-toolbar-left,
+    .calendar-toolbar-right{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .calendar-toolbar-left{
+      flex-direction:column;
+      align-items:flex-start;
+      gap:10px;
+    }
+
+    .calendar-title{
+      font-size:34px;
+      font-weight:900;
+      color:var(--text);
+      margin:0;
+      line-height:1;
+      text-transform:capitalize;
+    }
+
+    .calendar-helper{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .helper-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:#fff;
+      color:#53657F;
+      font-size:12px;
+      font-weight:800;
+      box-shadow:0 8px 20px rgba(16,40,74,.04);
+    }
+
+    .calendar-legend{
+      display:flex;
+      gap:16px;
+      flex-wrap:wrap;
+      margin:10px 0 16px;
+      color:var(--muted);
+      font-weight:700;
+    }
+
+    .legend-item{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+
+    .legend-dot{
+      width:14px;
+      height:14px;
+      border-radius:999px;
+      display:inline-block;
+    }
+
+    .dot-green{ background:#2EAE6B; }
+    .dot-yellow{ background:#D0A12B; }
+    .dot-red{ background:#C84A4A; }
+    .dot-gray{ background:#7C8798; }
+
     .calendar-grid{
       display:grid;
       grid-template-columns:repeat(7, minmax(195px, 1fr));
@@ -323,6 +485,11 @@
       font-size:12px;
       font-weight:900;
       white-space:nowrap;
+    }
+
+    .day-date-badge.holiday{
+      background:#FFF3D5;
+      color:#9A6500;
     }
 
     .service-box{
@@ -381,38 +548,13 @@
       width:100%;
       justify-content:center;
       margin-bottom:10px;
+      text-align:center;
     }
 
     .service-actions{
       display:grid;
       grid-template-columns:1fr 1fr;
       gap:8px;
-    }
-
-    .icon-btn{
-      width:100%;
-      min-height:42px;
-      border-radius:14px;
-      border:1px solid var(--border);
-      background:#fff;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:22px;
-      font-weight:900;
-      cursor:pointer;
-      transition:.15s ease;
-      color:#17365d;
-    }
-
-    .icon-btn:hover{
-      transform:translateY(-1px);
-      box-shadow:0 8px 16px rgba(16,40,74,.08);
-    }
-
-    .icon-btn.blocked{
-      background:#FFE3E3;
-      border-color:#E6A9A9;
     }
 
     .calendar-status{
@@ -424,7 +566,11 @@
     .calendar-status.ok{ color:#138a5a; }
     .calendar-status.bad{ color:#bf3d3d; }
 
-    @media (max-width: 1200px){
+    @media (max-width:1200px){
+      .bulk-controls{
+        grid-template-columns:1fr;
+      }
+
       .calendar-grid{
         grid-template-columns:repeat(7, minmax(180px, 1fr));
       }
@@ -433,23 +579,32 @@
         min-width:180px;
       }
 
-      .rules-grid,
-      .quick-rules{
-        grid-template-columns:repeat(2, minmax(0, 1fr));
-      }
-
-      .rules-grid-3{
-        grid-template-columns:1fr;
-      }
-
       .rule-row{
         grid-template-columns:1fr;
       }
     }
 
-    @media (max-width: 768px){
+    @media (max-width:768px){
+      .calendar-simple-card{
+        padding:18px;
+      }
+
+      .weekday-pills{
+        gap:10px;
+      }
+
+      .weekday-pill{
+        min-height:48px;
+        padding:0 16px;
+        font-size:14px;
+      }
+
+      .bulk-actions{
+        grid-template-columns:1fr;
+      }
+
       .calendar-title{
-        font-size:30px;
+        font-size:28px;
       }
 
       .calendar-grid{
@@ -464,20 +619,6 @@
       .service-meta-row{
         flex-direction:row;
         justify-content:flex-start;
-      }
-
-      .rules-card{
-        padding:18px;
-      }
-
-      .rules-grid,
-      .rules-grid-3,
-      .quick-rules{
-        grid-template-columns:1fr;
-      }
-
-      .rules-actions .btn{
-        width:100%;
       }
     }
   </style>
@@ -527,16 +668,16 @@
   <main class="admin-content">
     <section class="page-header">
       <h1>Gestisci calendario</h1>
-      <p>Blocca servizi, cambia capienze e gestisci gli orari visibili nella pagina di prenotazione</p>
+      <p>Apri o chiudi pranzi e cene in modo semplice. I festivi valgono come festivi, non come giorno della settimana.</p>
     </section>
 
-    <section class="rules-card">
-      <div class="rules-card-head">
+    <section class="calendar-simple-card">
+      <div class="calendar-simple-head">
         <div>
           <h2>Orari e blocchi prenotazioni</h2>
           <p>
-            Da qui puoi decidere quali orari mostrare su index.html e puoi bloccare pranzi, cene,
-            giorni specifici, feriali o festivi.
+            Clicca su un giorno per aprire o chiudere pranzo e cena.  
+            Le modifiche vengono salvate automaticamente.
           </p>
         </div>
 
@@ -545,157 +686,54 @@
         </button>
       </div>
 
-      <form id="serviceRuleForm">
-        <div class="rules-grid">
-          <div class="rules-field">
-            <label for="ruleStartDay">Dal giorno *</label>
-            <input id="ruleStartDay" type="date" required>
-          </div>
-
-          <div class="rules-field">
-            <label for="ruleEndDay">Fino al giorno</label>
-            <input id="ruleEndDay" type="date">
-          </div>
-
-          <div class="rules-field">
-            <label for="ruleService">Servizio *</label>
-            <select id="ruleService" required>
-              <option value="both">Pranzo e cena</option>
-              <option value="lunch">Solo pranzo</option>
-              <option value="dinner">Solo cena</option>
-            </select>
-          </div>
-
-          <div class="rules-field">
-            <label for="ruleClosed">Stato *</label>
-            <select id="ruleClosed" required>
-              <option value="false">Aperto / prenotabile</option>
-              <option value="true">Bloccato / non prenotabile</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="rules-grid">
-          <div class="rules-field">
-            <label for="ruleScope">Applica a *</label>
-            <select id="ruleScope" required>
-              <option value="all">Tutti i giorni</option>
-              <option value="weekday">Un giorno della settimana</option>
-              <option value="working_days">Giorni feriali</option>
-              <option value="holidays">Festivi e domeniche</option>
-              <option value="custom">Solo questa data / periodo</option>
-            </select>
-          </div>
-
-          <div class="rules-field">
-            <label for="ruleWeekday">Giorno settimana</label>
-            <select id="ruleWeekday">
-              <option value="">Non specifico</option>
-              <option value="1">Lunedì</option>
-              <option value="2">Martedì</option>
-              <option value="3">Mercoledì</option>
-              <option value="4">Giovedì</option>
-              <option value="5">Venerdì</option>
-              <option value="6">Sabato</option>
-              <option value="0">Domenica</option>
-            </select>
-          </div>
-
-          <div class="rules-field">
-            <label for="ruleOpenTime">Apertura</label>
-            <input id="ruleOpenTime" type="time" value="12:30">
-          </div>
-
-          <div class="rules-field">
-            <label for="ruleCloseTime">Chiusura</label>
-            <input id="ruleCloseTime" type="time" value="15:00">
-          </div>
-        </div>
-
-        <div class="rules-grid-3">
-          <div class="rules-field">
-            <label for="ruleSlotStep">Intervallo orari</label>
-            <select id="ruleSlotStep">
-              <option value="15">Ogni 15 minuti</option>
-              <option value="30">Ogni 30 minuti</option>
-              <option value="45">Ogni 45 minuti</option>
-              <option value="60">Ogni 60 minuti</option>
-            </select>
-          </div>
-
-          <div class="rules-field">
-            <label for="rulePriority">Priorità</label>
-            <select id="rulePriority">
-              <option value="10">Normale</option>
-              <option value="50">Alta</option>
-              <option value="100">Massima</option>
-            </select>
-          </div>
-
-          <div class="rules-field">
-            <label for="ruleNote">Nota</label>
-            <input id="ruleNote" placeholder="Esempio: chiusura straordinaria, evento, festivo...">
-          </div>
-        </div>
-
-        <div class="rules-actions">
-          <button class="btn btn-primary" type="submit" id="saveServiceRuleBtn">
-            Salva regola
-          </button>
-
-          <button class="btn btn-soft" type="reset" id="resetServiceRuleBtn">
-            Pulisci
-          </button>
-
-          <button class="btn btn-danger" type="button" id="deletePastRulesBtn">
-            Elimina regole passate
-          </button>
-        </div>
-
-        <div id="serviceRulesStatus" class="rules-status"></div>
-      </form>
-
-      <div class="quick-rules">
-        <button class="quick-rule-btn" type="button" data-quick-rule="close-all-lunch">
-          Blocca tutti i pranzi
-          <span>Da una data in avanti, o fino a una data scelta.</span>
-        </button>
-
-        <button class="quick-rule-btn" type="button" data-quick-rule="close-all-dinner">
-          Blocca tutte le cene
-          <span>Utile per chiudere il servizio serale.</span>
-        </button>
-
-        <button class="quick-rule-btn" type="button" data-quick-rule="close-weekday">
-          Blocca un giorno fisso
-          <span>Esempio: tutti i lunedì, pranzo e cena.</span>
-        </button>
-
-        <button class="quick-rule-btn" type="button" data-quick-rule="close-holiday-lunch">
-          Blocca pranzi festivi
-          <span>Festivi nazionali e domeniche.</span>
-        </button>
-
-        <button class="quick-rule-btn" type="button" data-quick-rule="close-holiday-dinner">
-          Blocca cene festive
-          <span>Festivi nazionali e domeniche.</span>
-        </button>
-
-        <button class="quick-rule-btn" type="button" data-quick-rule="close-working-lunch">
-          Blocca pranzi feriali
-          <span>Dal lunedì al sabato, esclusi festivi.</span>
-        </button>
-
-        <button class="quick-rule-btn" type="button" data-quick-rule="close-working-dinner">
-          Blocca cene feriali
-          <span>Dal lunedì al sabato, esclusi festivi.</span>
-        </button>
-
-        <button class="quick-rule-btn" type="button" data-quick-rule="open-standard">
-          Ripristina orari standard
-          <span>Pranzo 12:30-15:00, cena 18:30-23:00.</span>
-        </button>
+      <div class="restaurant-helper">
+        <div><strong>Priorità:</strong> generico livello 1, giorni/festivi livello 2, calendario singola data livello 3.</div>
+        <div><strong>Festivi:</strong> vengono considerati solo i festivi nazionali. Se una data è festiva, vale come “Festivi” e non come lunedì, martedì, domenica, ecc.</div>
       </div>
+
+      <div class="weekday-pills">
+        <button type="button" class="weekday-pill" data-rule-day="1">Lunedì</button>
+        <button type="button" class="weekday-pill" data-rule-day="2">Martedì</button>
+        <button type="button" class="weekday-pill" data-rule-day="3">Mercoledì</button>
+        <button type="button" class="weekday-pill" data-rule-day="4">Giovedì</button>
+        <button type="button" class="weekday-pill" data-rule-day="5">Venerdì</button>
+        <button type="button" class="weekday-pill" data-rule-day="6">Sabato</button>
+        <button type="button" class="weekday-pill" data-rule-day="0">Domenica</button>
+        <button type="button" class="weekday-pill holiday" data-rule-day="holidays">Festivi</button>
+      </div>
+
+      <div class="bulk-controls">
+        <div class="bulk-box">
+          <h3>Pranzi</h3>
+          <div class="bulk-actions">
+            <button type="button" class="big-toggle-btn open" data-bulk-service="lunch" data-bulk-closed="false">
+              Apri tutti i pranzi
+            </button>
+            <button type="button" class="big-toggle-btn closed" data-bulk-service="lunch" data-bulk-closed="true">
+              Chiudi tutti i pranzi
+            </button>
+          </div>
+        </div>
+
+        <div class="bulk-box">
+          <h3>Cene</h3>
+          <div class="bulk-actions">
+            <button type="button" class="big-toggle-btn open" data-bulk-service="dinner" data-bulk-closed="false">
+              Apri tutte le cene
+            </button>
+            <button type="button" class="big-toggle-btn closed" data-bulk-service="dinner" data-bulk-closed="true">
+              Chiudi tutte le cene
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="priority-note">
+        I tasti “apri/chiudi tutti” sono regole generiche. I giorni specifici e i festivi hanno priorità più alta.
+        Le modifiche fatte nel calendario mensile su una data precisa hanno priorità massima.
+      </div>
+
+      <div id="serviceRulesStatus" class="rules-status"></div>
 
       <div class="rules-list-wrap">
         <div class="rules-list-head">
@@ -716,15 +754,43 @@
       </div>
     </section>
 
+    <div class="day-modal" id="dayRuleModal">
+      <div class="day-modal-backdrop" id="dayRuleModalBackdrop"></div>
+
+      <article class="day-modal-card">
+        <button type="button" class="day-modal-close" id="dayRuleModalClose">×</button>
+
+        <h2 class="day-modal-title" id="dayRuleModalTitle">Giorno</h2>
+        <p class="day-modal-subtitle" id="dayRuleModalSubtitle">
+          Clicca su pranzo o cena per aprire/chiudere. Salva automaticamente.
+        </p>
+
+        <div class="service-toggle-list">
+          <button type="button" class="service-toggle-btn" id="modalLunchToggle" data-service="lunch">
+            <span class="service-toggle-name">Pranzo</span>
+            <span class="service-toggle-state">...</span>
+          </button>
+
+          <button type="button" class="service-toggle-btn" id="modalDinnerToggle" data-service="dinner">
+            <span class="service-toggle-name">Cena</span>
+            <span class="service-toggle-state">...</span>
+          </button>
+        </div>
+
+        <div class="modal-small-note">
+          Rosso significa chiuso, verde significa aperto. La modifica viene salvata appena premi il pulsante.
+        </div>
+      </article>
+    </div>
+
     <section class="calendar-toolbar">
       <div class="calendar-toolbar-left">
         <h2 class="calendar-title" id="calendarMonthTitle">Calendario</h2>
 
         <div class="calendar-helper">
-          <span class="helper-pill">🔒 blocca / sblocca servizio singolo</span>
+          <span class="helper-pill">🔒 blocca / sblocca singola data</span>
           <span class="helper-pill">👥 cambia capienza da quel giorno in avanti</span>
-          <span class="helper-pill">🕒 orari letti dalle regole sopra</span>
-          <span class="helper-pill">🗓 prenotazioni / coperti</span>
+          <span class="helper-pill">⭐ singola data = priorità massima</span>
         </div>
       </div>
 
@@ -747,6 +813,6 @@
   </main>
 </div>
 
-<script type="module" src="js/calendar.js"></script>
+<script type="module" src="js/calendar.js?v=4"></script>
 </body>
 </html>
